@@ -3,6 +3,8 @@
 
 import sys
 from PyQt4 import QtGui, QtCore
+import logging
+# import time
 
 class ClickRecorder(QtGui.QWidget):
     
@@ -47,6 +49,30 @@ class ClickRecorder(QtGui.QWidget):
         qp.drawRoundRect(rect)
 
 
+def initLogging():
+    log = logging.getLogger('space_counter')
+    log.setLevel(logging.DEBUG)
+    # file handler
+    fh = logging.FileHandler('log.csv')
+    fh.setLevel(logging.DEBUG)
+    # console handler    
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.ERROR)
+    # set logging format
+
+    # asctime liefert zeitstempel folgend:  ‘2003-07-08 16:49:45,896’ [YYYY-MM-DD HH:MM:SS,MS]
+    # das Komma am ende vor MS bewirkt spaltenwechsel in csv-datei
+
+    format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # add to handlers    
+    fh.setFormatter(format)
+    ch.setFormatter(format)
+    # add handlers to log 
+    log.addHandler(fh)
+    log.addHandler(ch)
+    # initial log
+    log.info('Initial Log')
+
 
 def read_setup():
     if len(sys.argv) > 1:
@@ -76,6 +102,8 @@ def read_setup():
             
         
 def main():
+    # prints secs since the epoch: print(time.time())
+    initLogging()
     read_setup()
     app = QtGui.QApplication(sys.argv)
     click = ClickRecorder()
