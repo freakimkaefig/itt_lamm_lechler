@@ -65,6 +65,7 @@ class ClickRecorder(QtGui.QWidget):
         self.initUI()
         self.mouseX = 150
         self.mouseY = 0
+        self.active = 0
 
     def initUI(self):
         self.text = "Click the blue circles."
@@ -72,25 +73,37 @@ class ClickRecorder(QtGui.QWidget):
         self.setWindowTitle("Fitts' Law Test")
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.show()
-
-    def keyPressEvent(self, ev):
-        if ev.key() == QtCore.Qt.Key_Space:
-            self.counter += 1
-            self.update()
             
     def mousePressEvent(self, ev):
-        self.update()
+        if self.active == 0:
+            # innerhalb startrechteck?
+                #kreis zeichnen
+                #startzeit setzen
+                
+            self.update()
+            self.active = 1
+        else:
+            # innerhalb kreis?           
+            if((ev.x() - self.center.x())**2 + (ev.y() - self.center.y())**2 < self.radius**2):
+                print("hit circle")
+                #kreis löschen
+                #endzeit setzen
+                
+            # entfernung zum mittelpunkt:
+            xOffset = ev.x() - self.center.x()
+            yOffset = ev.y() - self.center.y()
+                #loggen (timestamp, width, distance, duration, xoffset, yoffset)
+            print("xOffset: ",xOffset," yOffset: ",yOffset)
+            
+            self.active = 0
 
     def paintEvent(self, event):
         qp = QtGui.QPainter()
         qp.begin(self)
         self.drawStartPosition(event, qp)
-        self.drawText(event, qp)
         self.drawCircle(event, qp, self.setup.getNextCombination())
+        self.drawText(event, qp)
         qp.end()
-        
-    def getCursorPos():
-        return QtGui.QCursor.pos()
         
     def drawStartPosition(self, event, qp):
         qp.setBrush(QtGui.QColor(0, 0, 255))
@@ -109,7 +122,9 @@ class ClickRecorder(QtGui.QWidget):
         self.mouseY = y
         self.text = "Distance: " + str(combination[0]) + " | Width: " + str(combination[1])
         qp.setBrush(QtGui.QColor(0, 0, 255))
-        qp.drawEllipse(self.mouseX + combination[0], y - (combination[1] / 2), combination[1], combination[1])
+        self.center = QtCore.QPoint(self.mouseX + combination[0], y)
+        self.radius = combination[1]/2
+        qp.drawEllipse(self.center, self.radius, self.radius)
 
 def setStartTime():
     start = time.time()
