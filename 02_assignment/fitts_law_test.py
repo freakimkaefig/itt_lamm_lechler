@@ -63,7 +63,7 @@ class ClickRecorder(QtGui.QWidget):
         self.setup = setup
         self.counter = 0
         self.initUI()
-        self.mouseX = 150
+        self.mouseX = 0
         self.mouseY = 0
         self.active = 0
 
@@ -74,46 +74,50 @@ class ClickRecorder(QtGui.QWidget):
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.show()
 
-    def mousePressEvent(self, ev):
+    def mousePressEvent(self, event):
+        self.mouseX = event.x()
+        self.mouseY = event.y()
+        self.update()
+
+    def paintEvent(self, event):
+        self.startRect = QtCore.QRect(0, (self.height() / 2) - 50, 100, 100)
+        qp = QtGui.QPainter()
+        qp.begin(self)
+        
         if self.active == 0:
             # innerhalb startrechteck?
-            if((ev.x() - self.startRect.x()) <= 100):
-                if(abs(ev.y() - self.startRect.y()) <= 50):
-                    print("rectX: ",self.startRect.x(),"mouseX: ",ev.x())
-                    #kreis zeichnen
+            if((self.mouseX - self.startRect.x()) <= 100):
+                if(abs(self.mouseY - self.startRect.y()) <= 50):
+                    print("rectX: ",self.startRect.x(),"mouseX: ", self.mouseX)
+                    # kreis zeichnen
+                    self.drawCircle(event, qp, self.setup.getNextCombination())
                     #startzeit setzen
 
-                    self.update()
+                    #self.update()
                     self.active = 1
         else:
             # innerhalb kreis?
-            if((ev.x() - self.center.x())**2 + (ev.y() - self.center.y())**2 < self.radius**2):
+            if((self.mouseX - self.center.x())**2 + (self.mouseY - self.center.y())**2 < self.radius**2):
                 print("hit circle")
                 #kreis löschen
                 #endzeit setzen
 
                 # entfernung zum mittelpunkt:
-                xOffset = ev.x() - self.center.x()
-                yOffset = ev.y() - self.center.y()
+                xOffset = self.mouseX - self.center.x()
+                yOffset = self.mouseY - self.center.y()
                     #loggen (timestamp, width, distance, duration, xoffset, yoffset)
-            print("xOffset: ", xOffset, " yOffset: ", yOffset)
-
+                print("xOffset: ", xOffset, " yOffset: ", yOffset)
                 self.active = 0
 
-    def paintEvent(self, event):
-        qp = QtGui.QPainter()
-        qp.begin(self)
-        self.drawStartPosition(event, qp)
-        self.drawCircle(event, qp, self.setup.getNextCombination())
-        self.drawText(event, qp)
+        self.drawStartPosition(qp)
+        self.drawText(qp)
         qp.end()
 
-    def drawStartPosition(self, event, qp):
+    def drawStartPosition(self, qp):
         qp.setBrush(QtGui.QColor(0, 0, 255))
-        rect = QtCore.QRect(0, (self.height() / 2) - 50, 100, 100)
         qp.drawRect(self.startRect)
 
-    def drawText(self, event, qp):
+    def drawText(self, qp):
         qp.setPen(QtGui.QColor(0, 0, 255))
         qp.setFont(QtGui.QFont('Decorative', 32))
         if self.counter > 0:
@@ -122,10 +126,9 @@ class ClickRecorder(QtGui.QWidget):
 
     def drawCircle(self, event, qp, combination):
         y = self.height() / 2
-        self.mouseY = y
         self.text = "Distance: " + str(combination[0]) + " | Width: " + str(combination[1]) + " | Active: " + str(self.active)
         qp.setBrush(QtGui.QColor(0, 0, 255))
-        self.center = QtCore.QPoint(self.mouseX + combination[0], y)
+        self.center = QtCore.QPoint(50 + combination[0], y)
         self.radius = combination[1]/2
         qp.drawEllipse(self.center, self.radius, self.radius)
 
