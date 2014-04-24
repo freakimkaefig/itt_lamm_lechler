@@ -20,6 +20,8 @@ class Setup():
 
     def __init__(self):
         self.read_setup_file()
+        self.combinations = self.calculate_combinations()
+        #print self.combinations
 
     def read_setup_file(self):
         if len(sys.argv) > 1:
@@ -36,6 +38,17 @@ class Setup():
                     if temp[0] == "DISTANCES:":
                         for x in temp[1].split(','):
                             self.distances.append(int(x))
+                            
+    def calculate_combinations(self):
+        combinations = self.repetitions * list(itertools.product(self.distances, self.widths))
+        random.shuffle(combinations)
+        return combinations
+    
+    def get_next_combination(self):
+        if self.counter < len(self.combinations):
+            self.counter += 1
+            return self.combinations[self.counter]
+    
 
 
 class ClickRecorder(QtGui.QWidget):
@@ -111,6 +124,8 @@ def init_setup():
     # reads setup from given file
     setup = Setup()
     print "User: " + str(setup.user)
+    print "First Combi: " + str(setup.get_next_combination())
+    print "Second Combi: " + str(setup.get_next_combination())
 
 
 def log(user, width, distance):
