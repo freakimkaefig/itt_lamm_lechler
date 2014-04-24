@@ -7,7 +7,7 @@ import logging
 import csv
 import random
 import itertools
-# import time
+import time
 
 
 class Setup():
@@ -113,10 +113,10 @@ def init_setup():
     print "User: " + str(setup.user)
 
 
-def log(user, width, distance):
+def log(user, width, distance, time):
     logfile = open("user" + str(user) + ".csv", "w+")
-    d = {"user": user, "time(ms)": 327}
-    out = csv.DictWriter(logfile, ["width", "distance", "time(ms)"])
+    d = {"timestamp": "%s\t%s\n % time.time()", "user": user, "width": width, "distance": distance, "time(ms)": time}
+    out = csv.DictWriter(logfile, ["timestamp", "user", "width", "distance", "time(ms)"])
     out.writeheader()
     out.writerow(d)
     logfile.close()
@@ -124,7 +124,8 @@ def log(user, width, distance):
 
 def main():
     # prints secs since the epoch: print(time.time())
-    initLogging()
+    # initLogging()
+    log(1,50, 300, 222)
     init_setup()
     app = QtGui.QApplication(sys.argv)
     click = ClickRecorder()
