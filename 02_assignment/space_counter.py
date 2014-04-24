@@ -12,14 +12,12 @@ import time
 
 class Setup():
 
-    widths = []
-    distances = []
-    repetitions = 4
-    combinations = []
-    counter = -1
-
     def __init__(self):
-        self.read_setup_file()
+        self.widths = []
+        self.distances = []
+        self.repetitions = 4
+        self.combinations = []
+        self.counter = -1
 
     def read_setup_file(self):
         if len(sys.argv) > 1:
@@ -36,6 +34,21 @@ class Setup():
                     if temp[0] == "DISTANCES:":
                         for x in temp[1].split(','):
                             self.distances.append(int(x))
+            self.calculate_combinations()
+            return 1
+        else:
+            return 0
+
+    def calculate_combinations(self):
+        combinations = self.repetitions * list(itertools.product(self.distances, self.widths))
+        random.shuffle(combinations)
+        return combinations
+    
+    def get_next_combination(self):
+        if self.counter < len(self.combinations):
+            self.counter += 1
+            return self.combinations[self.counter]
+    
 
 
 class ClickRecorder(QtGui.QWidget):
@@ -48,7 +61,7 @@ class ClickRecorder(QtGui.QWidget):
     def initUI(self):
         self.text = "Please press 'space' repeatedly."
         self.setGeometry(300, 300, 280, 170)
-        self.setWindowTitle('ClickRecorder')
+        self.setWindowTitle("Fitts' Law Recorder")
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.show()
 
@@ -110,7 +123,8 @@ def init_setup():
     # creates new object of type setup
     # reads setup from given file
     setup = Setup()
-    print "User: " + str(setup.user)
+    success = setup.read_setup_file()
+    return success
 
 
 def log(user, width, distance, time):
@@ -124,12 +138,16 @@ def log(user, width, distance, time):
 
 def main():
     # prints secs since the epoch: print(time.time())
-    # initLogging()
-    log(1,50, 300, 222)
-    init_setup()
-    app = QtGui.QApplication(sys.argv)
-    click = ClickRecorder()
-    sys.exit(app.exec_())
+    
+    setup_valid = init_setup()
+    if setup_valid == 1:
+        initLogging()
+        app = QtGui.QApplication(sys.argv)
+        click = ClickRecorder()
+        sys.exit(app.exec_())
+    else:
+        print "No setup file given"
+        print "Usage: 'python space_counter.py <setup.txt>'"
 
 
 if __name__ == '__main__':
