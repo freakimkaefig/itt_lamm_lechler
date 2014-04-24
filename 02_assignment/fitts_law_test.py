@@ -54,6 +54,8 @@ class Setup():
         if self.counter < len(self.combinations):
             self.counter += 1
             return self.combinations[self.counter]
+        else:
+            print("out of combinations")
 
 
 class ClickRecorder(QtGui.QWidget):
@@ -61,13 +63,14 @@ class ClickRecorder(QtGui.QWidget):
     def __init__(self, setup):
         super(ClickRecorder, self).__init__()
         self.setup = setup
-        self.counter = 0
         self.initUI()
         self.mouseX = 0
         self.mouseY = 0
         self.active = 0
+        self.misses = 0
 
     def initUI(self):
+        self.clicked = 0
         self.text = "Click the blue circles."
         self.setWindowState(QtCore.Qt.WindowMaximized)
         self.setWindowTitle("Fitts' Law Test")
@@ -75,40 +78,57 @@ class ClickRecorder(QtGui.QWidget):
         self.show()
 
     def mousePressEvent(self, event):
+        self.clicked = 1
         self.mouseX = event.x()
         self.mouseY = event.y()
         self.update()
 
     def paintEvent(self, event):
+        print("paintEvent!")
         self.startRect = QtCore.QRect(0, (self.height() / 2) - 50, 100, 100)
         qp = QtGui.QPainter()
         qp.begin(self)
         
-        if self.active == 0:
-            # innerhalb startrechteck?
-            if((self.mouseX - self.startRect.x()) <= 100):
-                if(abs(self.mouseY - self.startRect.y()) <= 50):
-                    print("rectX: ",self.startRect.x(),"mouseX: ", self.mouseX)
-                    # kreis zeichnen
-                    self.drawCircle(event, qp, self.setup.getNextCombination())
-                    #startzeit setzen
-
-                    #self.update()
-                    self.active = 1
+        
+        if(self.clicked == 1):
+            if self.active == 0:
+                print("a = 0? -> active: ", self.active)
+                # innerhalb startrechteck?
+                if(self.mouseX <= 100):
+                    if(self.mouseY - self.startRect.y() <= 100):
+                        if(self.mouseY - self.startRect.y() >= 0):
+                            print("rectX: ",self.startRect.x(),"mouseX: ", self.mouseX, "rectY: ",self.startRect.y(),"mouseY: ", self.mouseY)
+                            # kreis zeichnen
+                            self.combination = self.setup.getNextCombination()
+                            self.mouseXRect = self.mouseX
+                            #self.drawCircle(event, qp, self.setup.getNextCombination())
+                            #startzeit setzen
+        
+                            #self.update()
+                            self.active = 1
+            elif self.active == 1:
+                print("a = 1 ? -> active: ", self.active)
+                # innerhalb kreis?
+                if((self.mouseX - self.center.x())**2 + (self.mouseY - self.center.y())**2 < self.radius**2):
+                    print("hit circle")
+                    #endzeit setzen
+    
+                    # entfernung zum mittelpunkt:
+                    xOffset = self.mouseX - self.center.x()
+                    yOffset = self.mouseY - self.center.y()
+                        #loggen (timestamp, width, distance, duration, xoffset, yoffset)
+                    print("xOffset: ", xOffset, " yOffset: ", yOffset)
+                    self.active = 0
+                else:
+                    #loggen
+                    self.misses += 1
+                    
+            self.clicked = 0
+        if(self.active == 1):
+            self.drawCircle(event, qp, self.combination)
+            self.text = "click blue circle"
         else:
-            # innerhalb kreis?
-            if((self.mouseX - self.center.x())**2 + (self.mouseY - self.center.y())**2 < self.radius**2):
-                print("hit circle")
-                #kreis löschen
-                #endzeit setzen
-
-                # entfernung zum mittelpunkt:
-                xOffset = self.mouseX - self.center.x()
-                yOffset = self.mouseY - self.center.y()
-                    #loggen (timestamp, width, distance, duration, xoffset, yoffset)
-                print("xOffset: ", xOffset, " yOffset: ", yOffset)
-                self.active = 0
-
+            self.text = "click blue rectangle"
         self.drawStartPosition(qp)
         self.drawText(qp)
         qp.end()
@@ -120,15 +140,13 @@ class ClickRecorder(QtGui.QWidget):
     def drawText(self, qp):
         qp.setPen(QtGui.QColor(0, 0, 255))
         qp.setFont(QtGui.QFont('Decorative', 32))
-        if self.counter > 0:
-            self.text = str(self.counter)
         qp.drawText(150, 150, self.text)
 
     def drawCircle(self, event, qp, combination):
         y = self.height() / 2
-        self.text = "Distance: " + str(combination[0]) + " | Width: " + str(combination[1]) + " | Active: " + str(self.active)
+        self.text = "Distance: " + str(combination[0]) + " | Width: " + str(combination[1])
         qp.setBrush(QtGui.QColor(0, 0, 255))
-        self.center = QtCore.QPoint(50 + combination[0], y)
+        self.center = QtCore.QPoint(self.mouseXRect + combination[0], y)
         self.radius = combination[1]/2
         qp.drawEllipse(self.center, self.radius, self.radius)
 
@@ -172,7 +190,7 @@ def main():
         sys.exit(app.exec_())
     else:
         print "No setup file given"
-        print "Usage: 'python space_counter.py <setup.txt>'"
+        print "Usage: 'python fitts_law_test.py <setup.txt>'"
 
 
 if __name__ == '__main__':
