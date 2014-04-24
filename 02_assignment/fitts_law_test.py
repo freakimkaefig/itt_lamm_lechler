@@ -77,11 +77,14 @@ class ClickRecorder(QtGui.QWidget):
     def mousePressEvent(self, ev):
         if self.active == 0:
             # innerhalb startrechteck?
-                #kreis zeichnen
-                #startzeit setzen
+            if((ev.x() - self.startRect.x()) <= 100):
+                if(abs(ev.y() - self.startRect.y()) <= 50):
+                    print("rectX: ",self.startRect.x(),"mouseX: ",ev.x())
+                    #kreis zeichnen
+                    #startzeit setzen
 
-            self.update()
-            self.active = 1
+                    self.update()
+                    self.active = 1
         else:
             # innerhalb kreis?
             if((ev.x() - self.center.x())**2 + (ev.y() - self.center.y())**2 < self.radius**2):
@@ -89,13 +92,13 @@ class ClickRecorder(QtGui.QWidget):
                 #kreis löschen
                 #endzeit setzen
 
-            # entfernung zum mittelpunkt:
-            xOffset = ev.x() - self.center.x()
-            yOffset = ev.y() - self.center.y()
-                #loggen (timestamp, width, distance, duration, xoffset, yoffset)
+                # entfernung zum mittelpunkt:
+                xOffset = ev.x() - self.center.x()
+                yOffset = ev.y() - self.center.y()
+                    #loggen (timestamp, width, distance, duration, xoffset, yoffset)
             print("xOffset: ", xOffset, " yOffset: ", yOffset)
 
-            self.active = 0
+                self.active = 0
 
     def paintEvent(self, event):
         qp = QtGui.QPainter()
@@ -108,7 +111,7 @@ class ClickRecorder(QtGui.QWidget):
     def drawStartPosition(self, event, qp):
         qp.setBrush(QtGui.QColor(0, 0, 255))
         rect = QtCore.QRect(0, (self.height() / 2) - 50, 100, 100)
-        qp.drawRect(rect)
+        qp.drawRect(self.startRect)
 
     def drawText(self, event, qp):
         qp.setPen(QtGui.QColor(0, 0, 255))
@@ -120,7 +123,7 @@ class ClickRecorder(QtGui.QWidget):
     def drawCircle(self, event, qp, combination):
         y = self.height() / 2
         self.mouseY = y
-        self.text = "Distance: " + str(combination[0]) + " | Width: " + str(combination[1])
+        self.text = "Distance: " + str(combination[0]) + " | Width: " + str(combination[1]) + " | Active: " + str(self.active)
         qp.setBrush(QtGui.QColor(0, 0, 255))
         self.center = QtCore.QPoint(self.mouseX + combination[0], y)
         self.radius = combination[1]/2
