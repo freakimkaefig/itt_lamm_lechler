@@ -80,48 +80,41 @@ class ClickRecorder(QtGui.QWidget):
         self.update()
 
     def paintEvent(self, event):
-        print("paintEvent!")
         self.startRect = QtCore.QRect(0, (self.height() / 2) - 50, 100, 100)
         qp = QtGui.QPainter()
         qp.begin(self)
-        
-        
+
         if(self.clicked == 1):
             if self.active == 0:
-                print("a = 0? -> active: ", self.active)
                 # innerhalb startrechteck?
                 if(self.mouseX <= 100):
                     if(self.mouseY - self.startRect.y() <= 100):
                         if(self.mouseY - self.startRect.y() >= 0):
-                            print("rectX: ",self.startRect.x(),"mouseX: ", self.mouseX, "rectY: ",self.startRect.y(),"mouseY: ", self.mouseY)
                             # kreis zeichnen
                             self.combination = self.setup.getNextCombination()
                             self.mouseXRect = self.mouseX
                             #self.drawCircle(event, qp, self.setup.getNextCombination())
                             #startzeit setzen
                             self.setStartTime()
-        
+
                             #self.update()
                             self.active = 1
+
             elif self.active == 1:
-                print("a = 1 ? -> active: ", self.active)
                 # innerhalb kreis?
                 if((self.mouseX - self.center.x())**2 + (self.mouseY - self.center.y())**2 < self.radius**2):
-                    print("hit circle")
                     #endzeit setzen
                     self.setEndTime()
-    
                     # entfernung zum mittelpunkt:
                     xOffset = self.mouseX - self.center.x()
                     yOffset = self.mouseY - self.center.y()
-                    
+                    #log data
                     self.log(self.setup.user, self.combination[1], self.combination[0], self.getDuration(), xOffset, yOffset, self.misses)
                     self.active = 0
                     self.misses = 0
                 else:
-                    #loggen
                     self.misses += 1
-                    
+
             self.clicked = 0
         if(self.active == 1):
             self.drawCircle(event, qp, self.combination)
@@ -164,12 +157,11 @@ class ClickRecorder(QtGui.QWidget):
         if self.logInit == 0:
             out.writeheader()
             self.logInit = 1
-    
+
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         d = {"timestamp": timestamp, "user": user, "width": width, "distance": distance, "time(ms)": timeInMs, "offsetX": offsetX, "offsetY": offsetY, "misses": misses}
         out.writerow(d)
         logfile.close()
-            
 
 
 def initSetup():
