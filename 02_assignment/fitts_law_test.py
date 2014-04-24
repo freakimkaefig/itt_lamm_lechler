@@ -15,6 +15,7 @@ start = 0
 end = 0
 # time.time()
 
+
 class Setup():
 
     def __init__(self):
@@ -45,15 +46,14 @@ class Setup():
             return 0
 
     def calculateCombinations(self):
-        combinations = self.repetitions * list(itertools.product(self.distances, self.widths))
-        random.shuffle(combinations)
-        return combinations
-    
+        c = self.repetitions * list(itertools.product(self.distances, self.widths))
+        random.shuffle(c)
+        return c
+
     def getNextCombination(self):
         if self.counter < len(self.combinations):
             self.counter += 1
             return self.combinations[self.counter]
-    
 
 
 class ClickRecorder(QtGui.QWidget):
@@ -73,28 +73,28 @@ class ClickRecorder(QtGui.QWidget):
         self.setWindowTitle("Fitts' Law Test")
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.show()
-            
+
     def mousePressEvent(self, ev):
         if self.active == 0:
             # innerhalb startrechteck?
                 #kreis zeichnen
                 #startzeit setzen
-                
+
             self.update()
             self.active = 1
         else:
-            # innerhalb kreis?           
+            # innerhalb kreis?
             if((ev.x() - self.center.x())**2 + (ev.y() - self.center.y())**2 < self.radius**2):
                 print("hit circle")
                 #kreis löschen
                 #endzeit setzen
-                
+
             # entfernung zum mittelpunkt:
             xOffset = ev.x() - self.center.x()
             yOffset = ev.y() - self.center.y()
                 #loggen (timestamp, width, distance, duration, xoffset, yoffset)
-            print("xOffset: ",xOffset," yOffset: ",yOffset)
-            
+            print("xOffset: ", xOffset, " yOffset: ", yOffset)
+
             self.active = 0
 
     def paintEvent(self, event):
@@ -104,10 +104,10 @@ class ClickRecorder(QtGui.QWidget):
         self.drawCircle(event, qp, self.setup.getNextCombination())
         self.drawText(event, qp)
         qp.end()
-        
+
     def drawStartPosition(self, event, qp):
         qp.setBrush(QtGui.QColor(0, 0, 255))
-        rect = QtCore.QRect(0, self.mouseY - 50, 100, 100)
+        rect = QtCore.QRect(0, (self.height() / 2) - 50, 100, 100)
         qp.drawRect(rect)
 
     def drawText(self, event, qp):
@@ -126,21 +126,28 @@ class ClickRecorder(QtGui.QWidget):
         self.radius = combination[1]/2
         qp.drawEllipse(self.center, self.radius, self.radius)
 
-def setStartTime():
-    start = time.time()
-    
-def setEndTime():
-    end = time.time()
-def getDuration():
-    return end - start
+    def setStartTime():
+        start = time.time()
 
-def initLogging():
-    log(0, 0, 0, 0, 0, 0)
+    def setEndTime():
+        end = time.time()
+
+    def getDuration():
+        return end - start
+
+    def log(user, width, distance, timeInMs, offsetX, offsetY):
+        logfile = open("user" + str(user) + ".csv", "w+")
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        d = {"timestamp": timestamp, "user": user, "width": width, "distance": distance, "time(ms)": timeInMs, "offsetX": offsetX, "offsetY": offsetY}
+        out = csv.DictWriter(logfile, ["timestamp", "user", "width", "distance", "time(ms)", "offsetX", "offsetY"])
+        out.writeheader()
+        out.writerow(d)
+        logfile.close()
+
 
 def initSetup():
     # creates new object of type setup
     # reads setup from given file
-    initLogging()
     setup = Setup()
     success = setup.readSetupFile()
     if success == 1:
@@ -149,19 +156,9 @@ def initSetup():
         return 0
 
 
-def log(user, width, distance, timeInMs, offsetX, offsetY):
-    logfile = open("user" + str(user) + ".csv", "w+")
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    d = {"timestamp": timestamp, "user": user, "width": width, "distance": distance, "time(ms)": timeInMs, "offsetX": offsetX, "offsetY": offsetY}
-    out = csv.DictWriter(logfile, ["timestamp", "user", "width", "distance", "time(ms)", "offsetX", "offsetY"])
-    out.writeheader()
-    out.writerow(d)
-    logfile.close()
-
-
 def main():
     # prints secs since the epoch: print(time.time())
-    
+
     setup_valid = initSetup()
     if setup_valid != 0:
         app = QtGui.QApplication(sys.argv)
