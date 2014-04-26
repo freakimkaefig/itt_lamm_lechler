@@ -41,7 +41,9 @@ class Setup():
             return 0
 
     def calculateCombinations(self):
-        c = self.repetitions * list(itertools.product(self.distances, self.widths))
+        d = self.distances
+        w = self.widths
+        c = self.repetitions * list(itertools.product(d, w))
         random.shuffle(c)
         return c
 
@@ -84,16 +86,21 @@ class ClickRecorder(QtGui.QWidget):
         qp = QtGui.QPainter()
         qp.begin(self)
 
+        mX = self.mouseX
+        mY = self.mouseY
+        cX = self.center.x()
+        cY = self.center.y()
+
         if(self.clicked == 1):
             if self.active == 0:
                 # innerhalb startrechteck?
-                if(self.mouseX <= 100):
-                    if(self.mouseY - self.startRect.y() <= 100):
-                        if(self.mouseY - self.startRect.y() >= 0):
+                if(mX <= 100):
+                    if(mY - self.startRect.y() <= 100):
+                        if(mY - self.startRect.y() >= 0):
                             # kreis zeichnen
                             self.combination = self.setup.getNextCombination()
-                            self.mouseXRect = self.mouseX
-                            #self.drawCircle(event, qp, self.setup.getNextCombination())
+                            self.mouseXRect = mX
+
                             #startzeit setzen
                             self.setStartTime()
 
@@ -102,14 +109,16 @@ class ClickRecorder(QtGui.QWidget):
 
             elif self.active == 1:
                 # innerhalb kreis?
-                if((self.mouseX - self.center.x())**2 + (self.mouseY - self.center.y())**2 < self.radius**2):
+                if((mX - cX)**2 + (mY - cY)**2 < self.radius**2):
                     #endzeit setzen
                     self.setEndTime()
                     # entfernung zum mittelpunkt:
-                    xOffset = self.mouseX - self.center.x()
-                    yOffset = self.mouseY - self.center.y()
+                    xOffset = mX - cX
+                    yOffset = mY - cY
                     #log data
-                    self.log(self.setup.user, self.combination[1], self.combination[0], self.getDuration(), xOffset, yOffset, self.misses)
+                    self.log(self.setup.user, self.combination[1],
+                             self.combination[0], self.getDuration(),
+                             xOffset, yOffset, self.misses)
                     self.active = 0
                     self.misses = 0
                 else:
@@ -136,10 +145,12 @@ class ClickRecorder(QtGui.QWidget):
 
     def drawCircle(self, event, qp, combination):
         y = self.height() / 2
-        self.text = "Distance: " + str(combination[0]) + " | Width: " + str(combination[1])
+        d = combination[0]
+        w = combination[1]
+        self.text = "Distance: " + str(d) + " | Width: " + str(w)
         qp.setBrush(QtGui.QColor(0, 0, 255))
-        self.center = QtCore.QPoint(self.mouseXRect + combination[0], y)
-        self.radius = combination[1]/2
+        self.center = QtCore.QPoint(self.mouseXRect + d, y)
+        self.radius = w/2
         qp.drawEllipse(self.center, self.radius, self.radius)
 
     def setStartTime(self):
@@ -153,13 +164,17 @@ class ClickRecorder(QtGui.QWidget):
 
     def log(self, user, width, distance, timeInMs, offsetX, offsetY, misses):
         logfile = open("user" + str(user) + ".csv", "a")
-        out = csv.DictWriter(logfile, ["timestamp", "user", "width", "distance", "time(ms)", "offsetX", "offsetY", "misses"])
+        out = csv.DictWriter(logfile, ["timestamp", "user", "width",
+                                       "distance", "time(ms)", "offsetX",
+                                       "offsetY", "misses"])
         if self.logInit == 0:
             out.writeheader()
             self.logInit = 1
 
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        d = {"timestamp": timestamp, "user": user, "width": width, "distance": distance, "time(ms)": timeInMs, "offsetX": offsetX, "offsetY": offsetY, "misses": misses}
+        d = {"timestamp": timestamp, "user": user, "width": width,
+             "distance": distance, "time(ms)": timeInMs, "offsetX": offsetX,
+             "offsetY": offsetY, "misses": misses}
         out.writerow(d)
         logfile.close()
 
