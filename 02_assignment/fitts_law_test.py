@@ -3,7 +3,6 @@
 
 import sys
 from PyQt4 import QtGui, QtCore
-import logging
 import csv
 import random
 import itertools
@@ -88,8 +87,6 @@ class ClickRecorder(QtGui.QWidget):
 
         mX = self.mouseX
         mY = self.mouseY
-        cX = self.center.x()
-        cY = self.center.y()
 
         if(self.clicked == 1):
             if self.active == 0:
@@ -109,6 +106,8 @@ class ClickRecorder(QtGui.QWidget):
 
             elif self.active == 1:
                 # innerhalb kreis?
+                cX = self.center.x()
+                cY = self.center.y()
                 if((mX - cX)**2 + (mY - cY)**2 < self.radius**2):
                     #endzeit setzen
                     self.setEndTime()
