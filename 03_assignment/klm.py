@@ -38,15 +38,24 @@ def initSetup():
     
 def predictKlm(array):
     executionTime = 0.0
+    charArray = []
     for item in array:
         #print item
         line = re.findall('[0-9]*[a-z]', item)
         for charset in line:
             if len(charset) > 1:
                 print charset
-                factor = re.findall('[0-9]*', charset)
+                factor = re.findall('[0-9]+', charset)
                 char = re.findall('[a-z]', charset)
-                print factor, char
+                for number in factor:
+                    for i in range(int(number)):
+                        charArray.append(char)
+                #print factor
+                #print char
+            else:
+                charArray.append(charset)
+    print "ARRAY:"
+    print charArray
         
     
 
