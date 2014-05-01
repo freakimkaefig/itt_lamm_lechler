@@ -4,35 +4,34 @@
 import sys
 import re
 
+
 class Setup():
-    
+
     def __init__(self):
         self.array = []
-        self.dict = {'k': 0.28, 'p': 1.1, 'b': 0.1, 'h': 0.4, 'm': 1.2} #duration times according to Kieras (2011)
-    
+        self.dict = {'k': 0.28, 'p': 1.1, 'b': 0.1, 'h': 0.4, 'm': 1.2}
+        # duration times according to Kieras (2011)
+
     def readSetup(self):
         if len(sys.argv) > 1:
             with open(sys.argv[1]) as file:
                 for line in file:
                     temp = line.split()
                     temp2 = temp[0].partition('#')[0]
-                    #print(temp2)
                     temp3 = temp2.partition(' ')[0]
-                    #print("temp3: ", temp3)
                     if(temp3 != ""):
                         self.array.append(temp3.lower())
-                        #print("array: ",self.array)
             return 1
         else:
             return 0
+
 
 def calculateDuration(setup, arr):
     if arr == "":
         return 0
     else:
-        #for key, value in self.dict.items():
         return sum(setup.dict[k] for k in arr)
-            #sum(B[k] for k in common)
+
 
 def initSetup():
     # creates new object of type setup
@@ -43,8 +42,8 @@ def initSetup():
         return setup
     else:
         return 0
-    
-    
+
+
 def predictKlm(setup):
     charArray = []
     for item in setup.array:
@@ -58,22 +57,18 @@ def predictKlm(setup):
                     for number in factor:
                         for i in range(int(number)):
                             charArray.append(character)
-                #print factor
-                #print char
             else:
                 charArray.append(charset)
-    print "ARRAY:"
-    print charArray
-        
+
     executionTime = calculateDuration(setup, charArray)
-    print executionTime
+    print "Predicted execution time:", executionTime
+
 
 def main():
     # prints secs since the epoch: print(time.time())
 
     setup_valid = initSetup()
     if setup_valid != 0:
-        print("valid setup, do stuff!")
         predictKlm(setup_valid)
     else:
         print "No setup file given"
