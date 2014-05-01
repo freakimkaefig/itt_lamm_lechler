@@ -7,6 +7,7 @@ class Setup():
     
     def __init__(self):
         self.array = []
+        self.dict = {'k': 0.28, 'p': 1.1, 'b': 0.1, 'h': 0.4, 'm': 1.2}
     
     def readSetup(self):
         if len(sys.argv) > 1:
@@ -37,7 +38,15 @@ class Setup():
             return 1
         else:
             return 0
-        
+
+def calculateDuration(setup, arr):
+    if arr == "":
+        return 0
+    else:
+        #for key, value in self.dict.items():
+        return sum(setup.dict[k] for k in arr)
+            #sum(B[k] for k in common)
+
 def initSetup():
     # creates new object of type setup
     # reads setup from given file
