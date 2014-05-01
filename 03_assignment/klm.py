@@ -10,6 +10,8 @@ class Setup():
             with open(sys.argv[1]) as file:
                 for line in file:
                     temp = line.split()
+                    temp2 = temp[0].partition("#")[0]
+                    print(temp2)
                     #if temp[0] == "USER:":
                         #self.user = int(temp[1])
     
