@@ -48,3 +48,7 @@
  3.3) actual task completion time (average):
       (8.79 + 4.79 + 4.50 + 4.43 + 6.05) / 5 = 5.712 seconds
 
+
+4) Comment
+ Removing the "M" would reduce the predicted execution time. This would bring its value closer to the actual execution times.
+ A value of 1.2 seconds for “M” might be too big for simple thinking operations in the particular setting.
