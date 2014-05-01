@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import re
 
 class Setup():
     
@@ -20,20 +21,6 @@ class Setup():
                     if(temp3 != ""):
                         self.array.append(temp3.lower())
                         #print("array: ",self.array)
-                    
-                    #TODO to lower
-                    
-                    #if temp[0] == "USER:":
-                        #self.user = int(temp[1])
-    
-                    #if temp[0] == "WIDTHS:":
-                        #for x in temp[1].split(','):
-                            #self.widths.append(int(x))
-    
-                    #if temp[0] == "DISTANCES:":
-                        #for x in temp[1].split(','):
-                            #self.distances.append(int(x))
-            #self.combinations = self.calculateCombinations()
             return 1
         else:
             return 0
@@ -47,7 +34,21 @@ def initSetup():
         return setup
     else:
         return 0
-
+    
+    
+def predictKlm(array):
+    executionTime = 0.0
+    for item in array:
+        #print item
+        line = re.findall('[0-9]*[a-z]', item)
+        for charset in line:
+            if len(charset) > 1:
+                print charset
+                factor = re.findall('[0-9]*', charset)
+                char = re.findall('[a-z]', charset)
+                print factor, char
+        
+    
 
 def main():
     # prints secs since the epoch: print(time.time())
@@ -55,9 +56,7 @@ def main():
     setup_valid = initSetup()
     if setup_valid != 0:
         print("valid setup, do stuff!")
-        #app = QtGui.QApplication(sys.argv)
-        #click = ClickRecorder(setup_valid)
-        #sys.exit(app.exec_())
+        predictKlm(setup_valid.array)
     else:
         print "No setup file given"
         print "Usage: 'python klm.py <setup.txt>'"
