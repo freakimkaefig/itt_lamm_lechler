@@ -22,7 +22,8 @@ class Setup():
                     temp2 = temp[0].partition('#')[0]
                     # exclude comments if comment is a single line
                     temp3 = temp2.partition(' ')[0]
-                    # excludes whitespaces before "#" if comment is after operators
+                    # excludes whitespaces before "#"
+                    # if comment is after operators
                     if(temp3 != ""):
                         self.array.append(temp3.lower())
             return 1
@@ -77,8 +78,6 @@ def predictKlm(setup):
 
 
 def main():
-    # prints secs since the epoch: print(time.time())
-
     setup_valid = initSetup()
     if setup_valid != 0:
         predictKlm(setup_valid)
