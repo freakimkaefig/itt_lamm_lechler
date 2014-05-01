@@ -20,7 +20,9 @@ class Setup():
                 for line in file:
                     temp = line.split()
                     temp2 = temp[0].partition('#')[0]
+                    # exclude comments if comment is a single line
                     temp3 = temp2.partition(' ')[0]
+                    # excludes whitespaces before "#" if comment is after operators
                     if(temp3 != ""):
                         self.array.append(temp3.lower())
             return 1
