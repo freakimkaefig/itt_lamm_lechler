@@ -1,0 +1,18 @@
+a) The performance of which type of user can be predicted by KLM, according to Card et al.?
+
+According to Card et al. (1980) the performance of expert users can be predicted by KLM.
+
+
+
+b) Which Fitts’ Law formulation is used by Card et al.?
+
+t(p) = 0.8 + 0.1 * log2 (d/s + 0.5)
+Analogue to the Shannon Formulation (MacKenzie, 1989):
+MT = a + b × log2(A/W + 1)
+
+
+
+c) Why might the original KLM not perfectly model input performance on a laptop? How could it be adapted?
+
+Pointing can be accomplished using the Touchpad of a laptop. Homing seems redundant in this case, because the Touchpad is typically close by the keyboard of a laptop so homing could be dropped.
+Moreover pointing with a Touchpad probably takes a longer time than doing so with a computer mouse including homing. The time required for pointing with a Touchpad may vary widely among different users depending on their skills and experience with Touchpads.
