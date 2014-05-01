@@ -15,8 +15,13 @@ class Setup():
                     temp = line.split()
                     temp2 = temp[0].partition('#')[0]
                     #print(temp2)
-                    self.array.append(temp2.partition(' ')[0])
-                    print("array: ",self.array)
+                    temp3 = temp2.partition(' ')[0]
+                    #print("temp3: ", temp3)
+                    if(temp3 != ""):
+                        self.array.append(temp3.lower())
+                        #print("array: ",self.array)
+                    
+                    #TODO to lower
                     
                     #if temp[0] == "USER:":
                         #self.user = int(temp[1])
