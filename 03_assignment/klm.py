@@ -45,20 +45,19 @@ def initSetup():
         return 0
     
     
-def predictKlm(array):
-    executionTime = 0.0
+def predictKlm(setup):
     charArray = []
-    for item in array:
+    for item in setup.array:
         #print item
         line = re.findall('[0-9]*[a-z]', item)
         for charset in line:
             if len(charset) > 1:
-                print charset
                 factor = re.findall('[0-9]+', charset)
                 char = re.findall('[a-z]', charset)
-                for number in factor:
-                    for i in range(int(number)):
-                        charArray.append(char)
+                for character in char:
+                    for number in factor:
+                        for i in range(int(number)):
+                            charArray.append(character)
                 #print factor
                 #print char
             else:
@@ -66,7 +65,8 @@ def predictKlm(array):
     print "ARRAY:"
     print charArray
         
-    
+    executionTime = calculateDuration(setup, charArray)
+    print executionTime
 
 def main():
     # prints secs since the epoch: print(time.time())
@@ -74,7 +74,7 @@ def main():
     setup_valid = initSetup()
     if setup_valid != 0:
         print("valid setup, do stuff!")
-        predictKlm(setup_valid.array)
+        predictKlm(setup_valid)
     else:
         print "No setup file given"
         print "Usage: 'python klm.py <setup.txt>'"
