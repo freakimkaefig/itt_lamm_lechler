@@ -9,7 +9,7 @@ class Setup():
 
     def __init__(self):
         self.array = []
-        self.dict = {'k': 0.28, 'p': 1.1, 'b': 0.1, 'h': 0.4, 'm': 1.2}
+        self.dict = {'k': 0.28, 'p': 1.1, 'b': 0.1, 'h': 0.4, 'm': 1.2, 'w': 0.001}
         # duration times according to Kieras (2011)
 
     def readSetup(self):
