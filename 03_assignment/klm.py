@@ -13,6 +13,7 @@ class Setup():
         # duration times according to Kieras (2011)
 
     def readSetup(self):
+        # creating array of lines
         if len(sys.argv) > 1:
             with open(sys.argv[1]) as file:
                 for line in file:
@@ -46,18 +47,26 @@ def initSetup():
 
 def predictKlm(setup):
     charArray = []
+
+    # iterating over lines in array from setup
     for item in setup.array:
-        #print item
+        # searching combinations of numbers and character
         line = re.findall('[0-9]*[a-z]', item)
+
         for charset in line:
             if len(charset) > 1:
+                # character and factor
+
+                # extracting factor and character
                 factor = re.findall('[0-9]+', charset)
                 char = re.findall('[a-z]', charset)
                 for character in char:
                     for number in factor:
                         for i in range(int(number)):
+                            # adding character with repititions
                             charArray.append(character)
             else:
+                # single character
                 charArray.append(charset)
 
     executionTime = calculateDuration(setup, charArray)
