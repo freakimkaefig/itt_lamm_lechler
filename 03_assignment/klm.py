@@ -5,13 +5,19 @@ import sys
 
 class Setup():
     
+    def __init__(self):
+        self.array = []
+    
     def readSetup(self):
         if len(sys.argv) > 1:
             with open(sys.argv[1]) as file:
                 for line in file:
                     temp = line.split()
-                    temp2 = temp[0].partition("#")[0]
-                    print(temp2)
+                    temp2 = temp[0].partition('#')[0]
+                    #print(temp2)
+                    self.array.append(temp2.partition(' ')[0])
+                    print("array: ",self.array)
+                    
                     #if temp[0] == "USER:":
                         #self.user = int(temp[1])
     
