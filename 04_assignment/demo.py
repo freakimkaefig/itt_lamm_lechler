@@ -4,20 +4,23 @@
 import sys
 from PyQt4 import QtGui, QtCore
 import re
+from itertools import chain
+
 
 class SuperText(QtGui.QTextEdit):
- 
-    def __init__(self, example_text):
+
+    def __init__(self, text):
         super(SuperText, self).__init__()
-        self.words=[]
-        self.template_doc = ""
-        self.setHtml(example_text)
-        self.prev_content = ""
-        self.generate_template()
-        self.render_template()
+        self.textfile = text
+        self.paragraphs = []
+        self.readFile()
+        self.template = ""
+        self.setHtml(text)
+        self.generateTemplate()
+        self.renderTemplate()
         self.initUI()
-        
-    def initUI(self):      
+
+    def initUI(self):
         self.setGeometry(0, 0, 400, 400)
         self.setWindowTitle('SuperText')
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
@@ -26,42 +29,61 @@ class SuperText(QtGui.QTextEdit):
 
     def wheelEvent(self, ev):
         super(SuperText, self).wheelEvent(ev)
-        self.generate_template()
-        self.render_template()
+        self.generateTemplate()
+        self.renderTemplate()
         anc = self.anchorAt(ev.pos())
         if (anc):
-            self.change_size(anc, ev.delta())
+            self.changeSize(anc, ev.delta())
 
-    def change_value(self, val_id, amount):
-        self.words[int(str(val_id))] += amount / 120 
-        self.render_template()
-        
-    def render_template(self):
+    def readFile(self):
+        f = open(self.textfile, "r")
+        data = f.read()
+        self.paragraphs = data.split("\n")
+        #print self.paragraphs
+
+    def generateTemplate(self):
+        p = self.paragraphs
+        content = "".join(str(i) for i in chain(*p))
+        if len(p) == 0:
+            self.template = p
+            return
+        for i in range(len(p)):
+            content = re.sub(str(p[i]),
+                             "<a href='%d'><p>$%d$</p></a>" % (i, i), content, count=1)
+        #print content
+        self.template = content
+
+    def renderTemplate(self):
         cur = self.textCursor()
-        doc = self.template_doc 
-        for i, word in enumerate(self.words):
-            doc = doc.replace('$' + str(i) + '$', '%s' % (word))
-            #print word
+        doc = self.template
+        #print doc
+        for i, paragraph in enumerate(self.paragraphs):
+            doc = doc.replace('$' + str(i) + '$', '%s' % (paragraph))
+        #print doc
         self.setHtml(doc)
         self.setTextCursor(cur)
 
-    def generate_template(self):
-        content = str(self.toPlainText())
-        words = content.split()
-        print words
-        self.words = words
-    
-        if len(words) == 0:
-            self.template_doc = content
-            return
-        for i in range(len(words)):
-            content = re.sub(" " + str(words[i])  , " <a href='%d'>$%d$</a>" % (i, i), content, count=1)
-        self.template_doc = content
+    def changeSize(self, paragraphId, amount):
+        #print paragraphId
+        #print amount
+        #print self.paragraphs[int(paragraphId)]
+        style = 'a[href="' + paragraphId + '"] {font-size: 30pt;}'
+        print style
+        self.setStyleSheet(style)
+        htmlCheck=self.toHtml()
+        print htmlCheck
+        self.renderTemplate()
+
 
 def main():
-    app = QtGui.QApplication(sys.argv)
-    super_text = SuperText("An 123 Tagen kamen 1342 Personen.")
-    sys.exit(app.exec_())
+    if len(sys.argv) > 1:
+        app = QtGui.QApplication(sys.argv)
+        super_text = SuperText(sys.argv[1])
+        sys.exit(app.exec_())
+    else:
+        print "Usage:"
+        print "python demo.py <text.txt>"
+
 
 if __name__ == '__main__':
     main()
