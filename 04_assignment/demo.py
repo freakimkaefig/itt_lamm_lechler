@@ -1,6 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+#TODO:
+#1) Texteingabe abfangen
+#2) Stylesheet
+
 import sys
 from PyQt4 import QtGui, QtCore
 import re
