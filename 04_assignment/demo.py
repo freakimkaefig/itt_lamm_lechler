@@ -13,6 +13,7 @@ class SuperText(QtGui.QTextEdit):
         super(SuperText, self).__init__()
         self.textfile = text
         self.paragraphs = []
+        self.sizes = []
         self.readFile()
         self.template = ""
         self.setHtml(text)
@@ -39,6 +40,8 @@ class SuperText(QtGui.QTextEdit):
         f = open(self.textfile, "r")
         data = f.read()
         self.paragraphs = data.split("\n")
+        for i in range(len(self.paragraphs)):
+            self.sizes.append(14)
         #print self.paragraphs
 
     def generateTemplate(self):
@@ -49,7 +52,7 @@ class SuperText(QtGui.QTextEdit):
             return
         for i in range(len(p)):
             content = re.sub(str(p[i]),
-                             "<a href='%d'><p>$%d$</p></a>" % (i, i), content, count=1)
+                             "<a href='%d'><p style='font-size:14px'>$%d$</p></a>" % (i, i), content, count=1)
         #print content
         self.template = content
 
@@ -67,11 +70,13 @@ class SuperText(QtGui.QTextEdit):
         #print paragraphId
         #print amount
         #print self.paragraphs[int(paragraphId)]
-        style = 'a[href="' + paragraphId + '"] {font-size: 30pt;}'
-        print style
-        self.setStyleSheet(style)
+        i = int(paragraphId)
+        size = self.sizes[i]
+        newSize = self.sizes[i] + (amount / 120)
+        self.size[i] = newSize
         htmlCheck=self.toHtml()
         print htmlCheck
+        self.generateTemplate()
         self.renderTemplate()
 
 
