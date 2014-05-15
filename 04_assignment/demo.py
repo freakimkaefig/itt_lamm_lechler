@@ -1,6 +1,12 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+#TODO:
+#1) Texteingabe abfangen, abspeichern
+#2) Stylesheet
+#3) größenänderung visualisieren
+#4) HTML abspeichern (formatierung!)
+
 import sys
 from PyQt4 import QtGui, QtCore
 import re
