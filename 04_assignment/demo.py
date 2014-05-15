@@ -20,6 +20,7 @@ class SuperText(QtGui.QTextEdit):
         self.generateTemplate()
         self.renderTemplate()
         self.initUI()
+        self.textChanged.connect(self.onTextChanged)
 
     def initUI(self):
         self.setGeometry(0, 0, 400, 400)
@@ -35,6 +36,11 @@ class SuperText(QtGui.QTextEdit):
         anc = self.anchorAt(ev.pos())
         if (anc):
             self.changeSize(anc, ev.delta())
+            
+    def onTextChanged(self):
+        print "change"
+        print self.toPlainText()
+        # save text
 
     def readFile(self):
         f = open(self.textfile, "r")
@@ -70,16 +76,14 @@ class SuperText(QtGui.QTextEdit):
         self.setHtml(doc)
         self.setTextCursor(cur)
 
-    def changeSize(self, paragraphId, amount):
-        #print paragraphId
-        #print amount
-        #print self.paragraphs[int(paragraphId)]
+    def changeSize(self, paragraphId, amount):      
         i = int(paragraphId)
         size = self.sizes[i]
         newSize = self.sizes[i] + (amount / 120)
         self.sizes[i] = newSize
         htmlCheck=self.toHtml()
-        print htmlCheck
+        #print htmlCheck
+        #self.setStyleSheet("QTextEdit a {background-color : #f00;}")
         self.generateTemplate()
         self.renderTemplate()
 
