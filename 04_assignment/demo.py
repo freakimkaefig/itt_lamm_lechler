@@ -15,17 +15,19 @@ from itertools import chain
 
 class SuperText(QtGui.QTextEdit):
 
-    def __init__(self, text):
+    def __init__(self):
         super(SuperText, self).__init__()
-        self.textfile = text
+        self.text = "New File"  # standard text
         self.paragraphs = []    # list for paragraphs
         self.sizes = []         # list for font sizes
-        self.readFile()         # read given textfile
+        self.readText()         # read given textfile
         self.template = ""
-        self.setHtml(text)
+        self.setHtml(self.text)
+        self.setStyleSheet(".paragraph:hover { background:#f00; }")
         self.generateTemplate()
         self.renderTemplate()
         self.initUI()
+        # connect onTextChange-Listener
         self.textChanged.connect(self.onTextChanged)
 
     def initUI(self):
@@ -42,15 +44,14 @@ class SuperText(QtGui.QTextEdit):
         anc = self.anchorAt(ev.pos())
         if (anc):
             self.changeSize(anc, ev.delta())
-            
-    def onTextChanged(self):
-        print "change"
-        print self.toPlainText()
-        # save text
 
-    def readFile(self):
-        f = open(self.textfile, "r")
-        data = f.read()
+    def onTextChanged(self):
+        # update text when user inputs text
+        self.text = self.toPlainText()
+        self.readText()
+
+    def readText(self):
+        data = self.text
         # split textfile at linebreak
         self.paragraphs = data.split("\n")
         for i in range(len(self.paragraphs)):
@@ -67,9 +68,10 @@ class SuperText(QtGui.QTextEdit):
         for i in range(len(p)):
             size = str(self.sizes[i])
             content = re.sub(str(p[i]),
-                             "<a href='%d'><p style='font-size:%spx'>$%d$</p></a>" % (i, size, i),
+                             "<a class='paragraph' href='%d' style='color:#000; text-decoration:none;'><p style='font-size:%spx'>$%d$</p></a>" % (i, size, i),
                              content, count=1)
         #print content
+        content = content + "<style>a:hover { background: #f00; }</style>"
         self.template = content
 
     def renderTemplate(self):
@@ -82,26 +84,22 @@ class SuperText(QtGui.QTextEdit):
         self.setHtml(doc)
         self.setTextCursor(cur)
 
-    def changeSize(self, paragraphId, amount):      
+    def changeSize(self, paragraphId, amount):
         i = int(paragraphId)
         size = self.sizes[i]
         newSize = self.sizes[i] + (amount / 120)
         self.sizes[i] = newSize
-        htmlCheck=self.toHtml()
-        #print htmlCheck
+        htmlCheck = self.toHtml()
+        print htmlCheck
         #self.setStyleSheet("QTextEdit a {background-color : #f00;}")
         self.generateTemplate()
         self.renderTemplate()
 
 
 def main():
-    if len(sys.argv) > 1:
-        app = QtGui.QApplication(sys.argv)
-        super_text = SuperText(sys.argv[1])
-        sys.exit(app.exec_())
-    else:
-        print "Usage:"
-        print "python demo.py <text.txt>"
+    app = QtGui.QApplication(sys.argv)
+    super_text = SuperText()
+    sys.exit(app.exec_())
 
 
 if __name__ == '__main__':
