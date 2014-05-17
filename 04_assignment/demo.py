@@ -12,39 +12,34 @@ from PyQt4 import QtGui, QtCore
 import re
 from itertools import chain
 
-class Painter(QtGui.QTextEdit):
+class Painter(QtGui.QWidget):
     def __init__(self, parent=None):
         super(Painter, self).__init__(parent)
+        self.paintEvent()
 
-    def paintEvent(self, e):
+    def paintEvent(self):
         print "PAINTEVENT GOT CALLED"
-        #self.startRect = QtCore.QRect(0, (self.height() / 2) - 50, 100, 100)
-        #qp = QtGui.QPainter()
-        #qp.begin(self)
-        qp = QtGui.QPainter()
+        #super(Painter, self).paintEvent(event)
+        qp = QtGui.QPainter(self)#self.viewport())
         #qp.setOpacity(0.5)
-        qp.begin(self)
+        #qp.begin(self)
         self.drawCircle(qp)
         self.drawText(qp)
-        qp.end()
         #qp.end()
             
     def drawText(self, qp):
         #print "DRAWTEXT GOT CALLED"
         qp.setPen(QtGui.QColor(0, 0, 0))
         qp.setFont(QtGui.QFont('Decorative', 32))
-        st = SuperText(sys.argv[1])
+        st = SuperText()
         x = st.mouseX - 55
         y = st.mouseY + 16
+        #use st.sizes[] instead TEST
         qp.drawText(x, y, "TEST")
 
     def drawCircle(self, qp):
         #print "DRAWCIRCLE GOT CALLED"
-        #y = self.height() / 2
-        #d = combination[0]
-        #w = combination[1]
-        #self.text = "Distance: " + str(d) + " | Width: " + str(w)
-        st = SuperText(sys.argv[1])
+        st = SuperText()
         x = st.mouseX
         y = st.mouseY
         qp.setBrush(QtGui.QColor(0, 0, 255))
@@ -90,7 +85,8 @@ class SuperText(QtGui.QTextEdit):
         if (anc):
             self.changeSize(anc, ev.delta())
             painter = Painter(self)
-            painter.paintEvent(ev)
+            painter.update()
+            #painter.paintEvent(ev)
 
     def onTextChanged(self):
         # update text when user inputs text
