@@ -12,6 +12,46 @@ from PyQt4 import QtGui, QtCore
 import re
 from itertools import chain
 
+class Painter(QtGui.QTextEdit):
+    def __init__(self, parent=None):
+        super(Painter, self).__init__(parent)
+
+    def paintEvent(self, e):
+        print "PAINTEVENT GOT CALLED"
+        #self.startRect = QtCore.QRect(0, (self.height() / 2) - 50, 100, 100)
+        #qp = QtGui.QPainter()
+        #qp.begin(self)
+        qp = QtGui.QPainter()
+        #qp.setOpacity(0.5)
+        qp.begin(self)
+        self.drawCircle(qp)
+        self.drawText(qp)
+        qp.end()
+        #qp.end()
+            
+    def drawText(self, qp):
+        #print "DRAWTEXT GOT CALLED"
+        qp.setPen(QtGui.QColor(0, 0, 0))
+        qp.setFont(QtGui.QFont('Decorative', 32))
+        st = SuperText(sys.argv[1])
+        x = st.mouseX - 55
+        y = st.mouseY + 16
+        qp.drawText(x, y, "TEST")
+
+    def drawCircle(self, qp):
+        #print "DRAWCIRCLE GOT CALLED"
+        #y = self.height() / 2
+        #d = combination[0]
+        #w = combination[1]
+        #self.text = "Distance: " + str(d) + " | Width: " + str(w)
+        st = SuperText(sys.argv[1])
+        x = st.mouseX
+        y = st.mouseY
+        qp.setBrush(QtGui.QColor(0, 0, 255))
+        self.center = QtCore.QPoint(x, y)
+        #self.radius = w/2
+        qp.drawEllipse(self.center, 80, 80)
+
 
 class SuperText(QtGui.QTextEdit):
 
@@ -27,25 +67,32 @@ class SuperText(QtGui.QTextEdit):
         self.renderTemplate()
         self.initUI()
         self.textChanged.connect(self.onTextChanged)
+        self.mouseX = 0
+        self.mouseY = 0
 
     def initUI(self):
-        self.setGeometry(0, 0, 400, 400)
+        self.setGeometry(0, 0, 640, 480)
         self.setWindowTitle('SuperText')
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.setMouseTracking(True)
         self.show()
 
     def wheelEvent(self, ev):
+        #print "wheeeeeeeel"
         super(SuperText, self).wheelEvent(ev)
         self.generateTemplate()
         self.renderTemplate()
+        self.mouseX = ev.x()
+        self.mouseY = ev.y()
         anc = self.anchorAt(ev.pos())
         if (anc):
             self.changeSize(anc, ev.delta())
-            
+            painter = Painter(self)
+            painter.paintEvent(ev)
+        
     def onTextChanged(self):
         print "change"
-        print self.toPlainText()
+        #print self.toPlainText()
         # save text
 
     def readFile(self):
