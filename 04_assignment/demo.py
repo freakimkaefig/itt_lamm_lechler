@@ -4,48 +4,13 @@
 #TODO:
 #1) Texteingabe abfangen, abspeichern
 #2) Stylesheet
-#3) größenänderung visualisieren
 #4) HTML abspeichern (formatierung!)
 
 import sys
 from PyQt4 import QtGui, QtCore
 import re
 from itertools import chain
-
-class Painter(QtGui.QWidget):
-    def __init__(self, parent=None):
-        super(Painter, self).__init__(parent)
-        self.paintEvent()
-
-    def paintEvent(self):
-        print "PAINTEVENT GOT CALLED"
-        #super(Painter, self).paintEvent(event)
-        qp = QtGui.QPainter(self)#self.viewport())
-        #qp.setOpacity(0.5)
-        #qp.begin(self)
-        self.drawCircle(qp)
-        self.drawText(qp)
-        #qp.end()
-            
-    def drawText(self, qp):
-        #print "DRAWTEXT GOT CALLED"
-        qp.setPen(QtGui.QColor(0, 0, 0))
-        qp.setFont(QtGui.QFont('Decorative', 32))
-        st = SuperText()
-        x = st.mouseX - 55
-        y = st.mouseY + 16
-        #use st.sizes[] instead TEST
-        qp.drawText(x, y, "TEST")
-
-    def drawCircle(self, qp):
-        #print "DRAWCIRCLE GOT CALLED"
-        st = SuperText()
-        x = st.mouseX
-        y = st.mouseY
-        qp.setBrush(QtGui.QColor(0, 0, 255))
-        self.center = QtCore.QPoint(x, y)
-        #self.radius = w/2
-        qp.drawEllipse(self.center, 80, 80)
+from threading import Timer
 
 
 class SuperText(QtGui.QTextEdit):
@@ -66,6 +31,8 @@ class SuperText(QtGui.QTextEdit):
         self.textChanged.connect(self.onTextChanged)
         self.mouseX = 0
         self.mouseY = 0
+        self.size = ""
+        self.active = 0
 
     def initUI(self):
         self.setGeometry(0, 0, 640, 480)
@@ -75,8 +42,6 @@ class SuperText(QtGui.QTextEdit):
         self.show()
 
     def wheelEvent(self, ev):
-        #print "wheeeeeeeel"
-        super(SuperText, self).wheelEvent(ev)
         self.generateTemplate()
         self.renderTemplate()
         self.mouseX = ev.x()
@@ -84,9 +49,40 @@ class SuperText(QtGui.QTextEdit):
         anc = self.anchorAt(ev.pos())
         if (anc):
             self.changeSize(anc, ev.delta())
-            painter = Painter(self)
-            painter.update()
-            #painter.paintEvent(ev)
+            self.active = 1
+            self.update()
+
+    def paintEvent(self, event):
+        if(self.active == 1):
+            qp = QtGui.QPainter()
+            qp.begin(self.viewport())
+            self.drawCircle(qp)
+            self.drawText(qp)
+            qp.end()
+            t = Timer(1.0, self.changeActive)
+            t.start()
+        super(SuperText, self).paintEvent(event)
+
+    def changeActive(self):
+        if(self.active == 0):
+            self.active = 1
+        if(self.active == 1):
+            self.active = 0
+        self.update()
+
+    def drawText(self, qp):
+        qp.setPen(QtGui.QColor(255, 255, 255))
+        qp.setFont(QtGui.QFont('Decorative', 32))
+        x = 550  # oder x = self.mouseX + 70
+        y = 75  # oder y = self.mouseY - 20
+        qp.drawText(x, y, str(self.size))
+
+    def drawCircle(self, qp):
+        x = 575  # oder x = self.mouseX
+        y = 60  # oder y = self.mouseY
+        qp.setBrush(QtGui.QColor(0, 0, 255))
+        self.center = QtCore.QPoint(x, y)
+        qp.drawEllipse(self.center, 60, 60)
 
     def onTextChanged(self):
         # update text when user inputs text
@@ -99,7 +95,7 @@ class SuperText(QtGui.QTextEdit):
         self.paragraphs = data.split("\n")
         for i in range(len(self.paragraphs)):
             # set standard size for each paragraph
-            self.sizes.append(14)
+            self.sizes.append(18)
         #print self.paragraphs
 
     def generateTemplate(self):
@@ -109,9 +105,9 @@ class SuperText(QtGui.QTextEdit):
             self.template = p
             return
         for i in range(len(p)):
-            size = str(self.sizes[i])
+            self.size = str(self.sizes[i])
             content = re.sub(str(p[i]),
-                             "<a class='paragraph' href='%d' style='color:#000; text-decoration:none;'><p style='font-size:%spx'>$%d$</p></a>" % (i, size, i),
+                             "<a class='paragraph' href='%d' style='color:#000; text-decoration:none;'><p style='font-size:%spx'>$%d$</p></a>" % (i, self.size, i),
                              content, count=1)
         #print content
         content = content + "<style>a:hover { background: #f00; }</style>"
