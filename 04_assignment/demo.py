@@ -47,6 +47,7 @@ class SuperText(QtGui.QTextEdit):
         self.mouseX = ev.x()
         self.mouseY = ev.y()
         anc = self.anchorAt(ev.pos())
+        self.paragraph = anc
         if (anc):
             self.changeSize(anc, ev.delta())
             self.active = 1
@@ -57,7 +58,7 @@ class SuperText(QtGui.QTextEdit):
             qp = QtGui.QPainter()
             qp.begin(self.viewport())
             self.drawCircle(qp)
-            self.drawText(qp)
+            self.drawText(qp, event)
             qp.end()
             t = Timer(1.0, self.changeActive)
             t.start()
@@ -70,12 +71,12 @@ class SuperText(QtGui.QTextEdit):
             self.active = 0
         self.update()
 
-    def drawText(self, qp):
+    def drawText(self, qp, ev):
         qp.setPen(QtGui.QColor(255, 255, 255))
         qp.setFont(QtGui.QFont('Decorative', 32))
         x = 550  # oder x = self.mouseX + 70
         y = 75  # oder y = self.mouseY - 20
-        qp.drawText(x, y, str(self.size))
+        qp.drawText(x, y, str(self.sizes[int(self.paragraph)]))
 
     def drawCircle(self, qp):
         x = 575  # oder x = self.mouseX
