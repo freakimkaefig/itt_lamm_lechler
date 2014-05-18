@@ -74,13 +74,20 @@ class SuperText(QtGui.QTextEdit):
     def drawText(self, qp, ev):
         qp.setPen(QtGui.QColor(255, 255, 255))
         qp.setFont(QtGui.QFont('Decorative', 32))
-        x = 550  # oder x = self.mouseX + 70
-        y = 75  # oder y = self.mouseY - 20
-        qp.drawText(x, y, str(self.sizes[int(self.paragraph)]))
+        x = 550
+        # x = self.mouseX + 120
+        y = 75
+        # y = self.mouseY + 60
+        try:
+            qp.drawText(x, y, str(self.sizes[int(self.paragraph)]))
+        except ValueError:
+            print ""
 
     def drawCircle(self, qp):
-        x = 575  # oder x = self.mouseX
-        y = 60  # oder y = self.mouseY
+        x = 575
+        # x = self.mouseX + 60
+        y = 60
+        # y = self.mouseY + 60  
         qp.setBrush(QtGui.QColor(0, 0, 255))
         self.center = QtCore.QPoint(x, y)
         qp.drawEllipse(self.center, 60, 60)
