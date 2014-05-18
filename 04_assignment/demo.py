@@ -87,7 +87,7 @@ class SuperText(QtGui.QTextEdit):
         x = 575
         # x = self.mouseX + 60
         y = 60
-        # y = self.mouseY + 60  
+        # y = self.mouseY + 60
         qp.setBrush(QtGui.QColor(0, 0, 255))
         self.center = QtCore.QPoint(x, y)
         qp.drawEllipse(self.center, 60, 60)
@@ -104,7 +104,6 @@ class SuperText(QtGui.QTextEdit):
         for i in range(len(self.paragraphs)):
             # set standard size for each paragraph
             self.sizes.append(18)
-        #print self.paragraphs
 
     def generateTemplate(self):
         p = self.paragraphs
@@ -117,17 +116,14 @@ class SuperText(QtGui.QTextEdit):
             content = re.sub(str(p[i]),
                              "<a class='paragraph' href='%d' style='color:#000; text-decoration:none;'><p style='font-size:%spx'>$%d$</p></a>" % (i, self.size, i),
                              content, count=1)
-        #print content
         content = content + "<style>a:hover { background: #f00; }</style>"
         self.template = content
 
     def renderTemplate(self):
         cur = self.textCursor()
         doc = self.template
-        #print doc
         for i, paragraph in enumerate(self.paragraphs):
             doc = doc.replace('$' + str(i) + '$', '%s' % (paragraph))
-        #print doc
         self.setHtml(doc)
         self.setTextCursor(cur)
 
@@ -137,8 +133,6 @@ class SuperText(QtGui.QTextEdit):
         newSize = self.sizes[i] + (amount / 120)
         self.sizes[i] = newSize
         htmlCheck = self.toHtml()
-        print htmlCheck
-        #self.setStyleSheet("QTextEdit a {background-color : #f00;}")
         self.generateTemplate()
         self.renderTemplate()
 
