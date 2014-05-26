@@ -17,7 +17,7 @@ class SuperText(QtGui.QTextEdit):
 
     def __init__(self):
         super(SuperText, self).__init__()
-        self.text = "New File"  # standard text
+        self.text = "Heading\n\nThis shall be the first text passage. Probably used to describe the motivation and the content of the following paragraphs.\nThis is another paragraph. I dont know what to write anymore, but I guess its more readable to write complete words than some gibberish.\nI will demonstrate this by rolling my head over the keyboard:\nasjhfgagdhdfasghfxafghasfdasfgvS"  # standard text
         self.paragraphs = []    # list for paragraphs
         self.sizes = []         # list for font sizes
         self.readText()         # read given textfile
@@ -35,7 +35,7 @@ class SuperText(QtGui.QTextEdit):
         self.active = 0
 
     def initUI(self):
-        self.setGeometry(0, 0, 640, 480)
+        self.setGeometry(0, 0, 640, 1080)
         self.setWindowTitle('SuperText')
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.setMouseTracking(True)
