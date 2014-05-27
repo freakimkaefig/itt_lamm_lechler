@@ -1,9 +1,35 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Wiimote bubble level
+# WiiMote wrapper in pure Python
 #
-# Copyright (c) Lukas Lamm & David Lechler
+# Copyright (c) 2014 Raphael Wimmer <raphael.wimmer@ur.de>
+#
+# using code from gtkwhiteboard, http://stepd.org/gtkwhiteboard/
+# Copyright (c) 2008 Stephane Duchesneau,
+# which was modified by Pere Negre and Pietro Pilolli to work with the new
+# WiiMote Plus: https://raw.githubusercontent.com/pnegre/python-whiteboard/
+#   master/stuff/linuxWiimoteLib.py
+#
+# LICENSE:         MIT (X11) License:
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 import bluetooth
 import threading
@@ -106,7 +132,7 @@ class Buttons(object):
         return repr(self._state)
 
     def __getitem__(self, btn):
-        if self._state.has_key(btn):
+        if btn in self._state:
             return self._state[btn]
         else:
             raise KeyError(str(btn))
@@ -302,7 +328,8 @@ class WiiMote(object):
 
     def set_leds(self, led_list):
         if len(led_list) != len(self._leds):
-            raise IndexError("list length needs to be exactly %d!" % len(self._leds))
+            l = len(self._leds)
+            raise IndexError("list length needs to be exactly %d!" % l)
         else:
             self._leds.set_leds(led_list)
 
@@ -332,24 +359,24 @@ if __name__ == "__main__":
     wm = connect(addr, name)
 
     axis = -1  # 0 => X-Axis; 1 => Y-Axis
-    
+
     while True:
         wm.leds[0] = False
         wm.leds[1] = False
         wm.leds[2] = False
         wm.leds[3] = False
-        
+
         x = wm.accelerometer[0]
         y = wm.accelerometer[1]
 
-        if wm.buttons['Up'] == True or wm.buttons['Down'] == True:
+        if wm.buttons['Up'] is True or wm.buttons['Down'] is True:
             axis = 1
-            
-        if wm.buttons['Left'] == True or wm.buttons['Right'] == True:
+
+        if wm.buttons['Left'] is True or wm.buttons['Right'] is True:
             axis = 0
-            
+
         if axis == 0:
-            print "X-Achse" + str(x)
+            print "X-Achse |---| Offset: " + str(x - 514)
             if x < 454:
                 wm.leds[0] = True
             if x >= 454 and x < 514:
@@ -365,7 +392,7 @@ if __name__ == "__main__":
             if x > 554:
                 wm.leds[3] = True
         if axis == 1:
-            print "Y-Achse" + str(y)
+            print "Y-Achse |---| Offset: " + str(y - 514)
             if y < 454:
                 wm.leds[0] = True
             if y >= 454 and y < 514:
