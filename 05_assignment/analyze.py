@@ -365,7 +365,21 @@ fc = Flowchart(terminals={
 })
 w = fc.widget()
 layout.addWidget(fc.widget(), 0, 0, 2, 1)
+
+v1 = pg.ImageView()
+v2 = pg.ImageView()
+layout.addWidget(v1, 0, 1)
+layout.addWidget(v2, 1, 1)
+
 win.show()
+
+"""
+while True:
+    data= Achsen auslesen
+
+## Set the raw data as the input value to the flowchart
+fc.setInput(dataIn=data)
+"""
 
 
 if __name__ == "__main__":
@@ -391,12 +405,12 @@ if __name__ == "__main__":
     while True:
         print wm.accelerometer
         time.sleep(0.05)
-    """
+    ###"""
 
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
 
-"""
+
 class WiiMoteNode(Node):
     nodeName = 'WiiMote'
     
@@ -405,13 +419,31 @@ class WiiMoteNode(Node):
         ## Init node with single input terminal
         Node.__init__(self, name, terminals={
             'dataIn': {'io': 'in'}
-            'dataOut'
+            #'dataOut'
         })
-        
+
     def setView(self, view):
         self.view = view
         
     def process(self, data, display=True):
         if display and self.view is not None:
             if data is None:
+                self.view.setImage(np.zeros((1,1))) # give a blank array to clear the view
+            else:
+                self.view.setImage(data)
+#WTF?
+fclib.registerNodeType(WiiMoteNode, [('Display',)])
+
+v1Node = fc.createNode('WiiMote', pos=(0, -150))
+v1Node.setView(v1)
+
+v2Node = fc.createNode('WiiMote', pos=(150, -150))
+v2Node.setView(v2)
 """
+v3Node = fc.createNode('WiiMote', pos=(-150, 0))
+v3Node.setView(v2)
+"""
+fc.connectTerminals(fc['dataIn'], v1Node['dataIn'])
+fc.connectTerminals(fc['dataIn'], v2Node['dataIn'])
+#fc.connectTerminals(fc['dataIn'], v3Node['dataIn'])         
+  
