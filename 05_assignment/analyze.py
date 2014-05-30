@@ -33,6 +33,14 @@
 
 import bluetooth
 import threading
+import time
+import sys
+from pyqtgraph.flowchart import Flowchart, Node
+import pyqtgraph.flowchart.library as fclib
+from pyqtgraph.flowchart.library.common import CtrlNode
+from pyqtgraph.Qt import QtGui, QtCore
+import pyqtgraph as pg
+import numpy as np
 
 VERSION = (0, 1, 0)
 DEBUG = False
@@ -338,54 +346,75 @@ class WiiMote(object):
 
     #rumble = property(get_rumble, set_rumble)
 
+
+class WiiMoteNode(Node):
+    nodeName = 'WiiMote'
+    
+    def __init__(self, name):
+        self.plot = None
+        ## Init node with single input terminal
+        Node.__init__(self, name, terminals={
+            'dataIn': {'io': 'in'}
+            #'dataOut'
+        })
+
+    def setPlot(self, plot):
+        self.plot = plot
+        self.plot.enableAutoRange()
+        
+    def process(self, data, display=True):
+        if display and self.plot is not None:
+            if data is not None:
+                self.plot.plot(data)
+
+
 KNOWN_DEVICES = ['Nintendo RVL-CNT-01', 'Nintendo RVL-CNT-01-TR']
 
 
-
-from pyqtgraph.flowchart import Flowchart, Node
-import pyqtgraph.flowchart.library as fclib
-from pyqtgraph.flowchart.library.common import CtrlNode
-from pyqtgraph.Qt import QtGui, QtCore
-import pyqtgraph as pg
-
-
-# creating main window
-app = QtGui.QApplication([])
-win = QtGui.QMainWindow()
-win.setWindowTitle('Wiimote Accelerometer Analyze')
-cw = QtGui.QWidget()
-win.setCentralWidget(cw)
-layout = QtGui.QGridLayout()
-cw.setLayout(layout)
-    
-#creating flowchart
-fc = Flowchart(terminals={
-    'dataIn': {'io': 'in'},
-    'dataOut': {'io': 'out'}
-})
-w = fc.widget()
-layout.addWidget(fc.widget(), 0, 0, 2, 1)
-
-v1 = pg.ImageView()
-v2 = pg.ImageView()
-layout.addWidget(v1, 0, 1)
-layout.addWidget(v2, 1, 1)
-
-win.show()
-
-"""
-while True:
-    data= Achsen auslesen
-
-## Set the raw data as the input value to the flowchart
-fc.setInput(dataIn=data)
-"""
-
-
 if __name__ == "__main__":
-    import time
-    import sys
+    
+    
+    
+    # creating main window
+    app = QtGui.QApplication([])
+    win = QtGui.QMainWindow()
+    win.setWindowTitle('Wiimote Accelerometer Analyze')
+    cw = QtGui.QWidget()
+    win.setCentralWidget(cw)
+    layout = QtGui.QGridLayout()
+    cw.setLayout(layout)
+        
+    #creating flowchart
+    fc = Flowchart(terminals={
+        'dataIn': {'io': 'in'},
+        'dataOut': {'io': 'out'}
+    })
+    w = fc.widget()
+    layout.addWidget(fc.widget(), 0, 0, 2, 1)
+    
+    x = pg.PlotWidget()
+    y = pg.PlotWidget()
+    z = pg.PlotWidget()
+    layout.addWidget(x, 0, 1)
+    layout.addWidget(y, 0, 2)
+    layout.addWidget(z, 0, 3)
+    
+    fclib.registerNodeType(WiiMoteNode, [('Display',)])
+    
+    xNode = fc.createNode('WiiMote', pos=(0, -150))
+    xNode.setPlot(x)
+    
+    yNode = fc.createNode('WiiMote', pos=(150, -150))
+    yNode.setPlot(y)
 
+    zNode = fc.createNode('WiiMote', pos=(-150, 0))
+    zNode.setPlot(z)
+
+    fc.connectTerminals(fc['dataIn'], xNode['dataIn'])
+    fc.connectTerminals(fc['dataIn'], yNode['dataIn'])
+    fc.connectTerminals(fc['dataIn'], zNode['dataIn'])
+    
+    win.show()
 
     raw_input("Press the 'sync' button on the back of your Wiimote Plus " +
               "or buttons (1) and (2) on your classic Wiimote.\n" +
@@ -402,48 +431,39 @@ if __name__ == "__main__":
     wm = connect(addr, name)
     
     """
+    xVals = list()
+    curveX = x.plot(pen='y')
+    counter = 0
+    
+    def update():
+        global curveX, xVals, counter, wm
+        #print wm.accelerometer
+        xVals.append(wm.accelerometer[0])
+        print xVals
+        #curveX.setData(xVals[counter])
+        counter += 1
+    
+    timer = QtCore.QTimer()
+    timer.timeout.connect(update)
+    timer.start(0.5)
+    """
+    
+    """
     while True:
         print wm.accelerometer
-        time.sleep(0.05)
-    ###"""
-
-    if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
-        QtGui.QApplication.instance().exec_()
-
-
-class WiiMoteNode(Node):
-    nodeName = 'WiiMote'
-    
-    def __init__(self, name):
-        self.view = None
-        ## Init node with single input terminal
-        Node.__init__(self, name, terminals={
-            'dataIn': {'io': 'in'}
-            #'dataOut'
-        })
-
-    def setView(self, view):
-        self.view = view
+        xData = wm.accelerometer[0]
+        yData = wm.accelerometer[1]
+        zData = wm.accelerometer[2]
+        xNode.setInput(dataIn=xData)
+        yNode.setInput(dataIn=yData)
+        zNode.setInput(dataIn=zData)
         
-    def process(self, data, display=True):
-        if display and self.view is not None:
-            if data is None:
-                self.view.setImage(np.zeros((1,1))) # give a blank array to clear the view
-            else:
-                self.view.setImage(data)
-#WTF?
-fclib.registerNodeType(WiiMoteNode, [('Display',)])
+        time.sleep(0.05)
+    """
+    
+    
+    app.exec_()    
 
-v1Node = fc.createNode('WiiMote', pos=(0, -150))
-v1Node.setView(v1)
 
-v2Node = fc.createNode('WiiMote', pos=(150, -150))
-v2Node.setView(v2)
-"""
-v3Node = fc.createNode('WiiMote', pos=(-150, 0))
-v3Node.setView(v2)
-"""
-fc.connectTerminals(fc['dataIn'], v1Node['dataIn'])
-fc.connectTerminals(fc['dataIn'], v2Node['dataIn'])
-#fc.connectTerminals(fc['dataIn'], v3Node['dataIn'])         
+    
   
