@@ -349,7 +349,7 @@ class WiiMote(object):
 
 class WiiMoteNode(Node):
     nodeName = 'WiiMote'
-    
+
     def __init__(self, name):
         self.plot = None
         ## Init node with single input terminal
@@ -361,7 +361,7 @@ class WiiMoteNode(Node):
     def setPlot(self, plot):
         self.plot = plot
         self.plot.enableAutoRange()
-        
+
     def process(self, data, display=True):
         if display and self.plot is not None:
             if data is not None:
@@ -381,7 +381,7 @@ if __name__ == "__main__":
     win.setCentralWidget(cw)
     layout = QtGui.QGridLayout()
     cw.setLayout(layout)
-        
+
     #creating flowchart
     fc = Flowchart(terminals={
         'dataIn': {'io': 'in'},
@@ -389,7 +389,7 @@ if __name__ == "__main__":
     })
     w = fc.widget()
     layout.addWidget(fc.widget(), 0, 0, 2, 1)
-    
+
     # three widgets for x-, y- & z-Axis
     x = pg.PlotWidget()
     y = pg.PlotWidget()
@@ -398,7 +398,6 @@ if __name__ == "__main__":
     layout.addWidget(x, 0, 1)
     layout.addWidget(y, 0, 2)
     layout.addWidget(z, 0, 3)
-    
 
     raw_input("Press the 'sync' button on the back of your Wiimote Plus " +
               "or buttons (1) and (2) on your classic Wiimote.\n" +
@@ -413,32 +412,32 @@ if __name__ == "__main__":
         addr, name = sys.argv[1:3]
     print("Connecting to %s (%s)" % (name, addr))
     wm = connect(addr, name)
-    
+
     # display application window
     win.show()
-    
-    x_acc = [0]#*MAX_LENGTH
-    y_acc = [0]#*MAX_LENGTH
-    z_acc = [0]#*MAX_LENGTH
-    
+
+    x_acc = [0]  # *MAX_LENGTH
+    y_acc = [0]  # *MAX_LENGTH
+    z_acc = [0]  # *MAX_LENGTH
+
     curveX = x.plot(pen='y')
     #x.disableAutoRange()
-    x.setRange(yRange=(200,800))
-    
+    x.setRange(yRange=(200, 800))
+
     curveY = y.plot(pen='r')
     #y.disableAutoRange()
-    y.setRange(yRange=(200,800))
-    
+    y.setRange(yRange=(200, 800))
+
     curveZ = z.plot(pen='b')
     #z.disableAutoRange()
-    z.setRange(yRange=(200,800))
-    
+    z.setRange(yRange=(200, 800))
+
     counter = 0
     MAX_LENGTH = 500
-    
+
     def update():
         global curveX, curveY, curveZ, x_acc, y_acc, z_acc, counter, wm
-        
+
         # collect accelerometer data of each axis (x,y,z)
         x_acc.append(wm.accelerometer[0])
         # trim array to the last "MAX_LENGTH" (e.g. 5) entries
@@ -447,19 +446,19 @@ if __name__ == "__main__":
         y_acc = y_acc[-MAX_LENGTH:]
         z_acc.append(wm.accelerometer[2])
         z_acc = z_acc[-MAX_LENGTH:]
-        
+
         curveX.setData(x_acc)
         curveY.setData(y_acc)
         curveZ.setData(z_acc)
         counter += 1
         #print x_acc
-    
+
     timer = QtCore.QTimer()
     timer.timeout.connect(update)
     timer.start(50)
-    
+
     app.exec_()
-    
+
     """
     while True:
         print wm.accelerometer
@@ -469,7 +468,7 @@ if __name__ == "__main__":
         xNode.setInput(dataIn=xData)
         yNode.setInput(dataIn=yData)
         zNode.setInput(dataIn=zData)
-        
+
         time.sleep(0.05)
     """
     """
@@ -485,4 +484,3 @@ if __name__ == "__main__":
     fc.connectTerminals(fc['dataIn'], yNode['dataIn'])
     fc.connectTerminals(fc['dataIn'], zNode['dataIn'])
     """
-    
