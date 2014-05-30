@@ -369,11 +369,12 @@ class WiiMoteNode(Node):
 
 
 KNOWN_DEVICES = ['Nintendo RVL-CNT-01', 'Nintendo RVL-CNT-01-TR']
+MAX_LENGTH = 5
 
 
 if __name__ == "__main__":
     
-    
+   
     
     # creating main window
     app = QtGui.QApplication([])
@@ -401,7 +402,6 @@ if __name__ == "__main__":
     
     fclib.registerNodeType(WiiMoteNode, [('Display',)])
     
-MAX_LENGTH = 5
     xNode = fc.createNode('WiiMote', pos=(0, -150))
     xNode.setPlot(x)
     
@@ -437,19 +437,6 @@ MAX_LENGTH = 5
     xVals = list()
     curveX = x.plot(pen='y')
     counter = 0
-        # collect accelerometer data of each axis (x,y,z)
-        x_acc.append(wm.accelerometer[0])
-        # trim array to the last "MAX_LENGTH" (e.g. 5) entries
-        x_acc = x_acc[-MAX_LENGTH:]
-        y_acc.append(wm.accelerometer[1])
-        y_acc = y_acc[-MAX_LENGTH:]
-        z_acc.append(wm.accelerometer[2])
-        z_acc = z_acc[-MAX_LENGTH:]
-        
-        time.sleep(0.5)
-        #print("X: ", x_acc)
-        #print("Y: ", y_acc)
-        #print("Z: ", z_acc)
     
     
     def update():
@@ -476,11 +463,21 @@ MAX_LENGTH = 5
         zNode.setInput(dataIn=zData)
         
         time.sleep(0.05)
+        
     """
+    # collect accelerometer data of each axis (x,y,z)
+        x_acc.append(wm.accelerometer[0])
+        # trim array to the last "MAX_LENGTH" (e.g. 5) entries
+        x_acc = x_acc[-MAX_LENGTH:]
+        y_acc.append(wm.accelerometer[1])
+        y_acc = y_acc[-MAX_LENGTH:]
+        z_acc.append(wm.accelerometer[2])
+        z_acc = z_acc[-MAX_LENGTH:]
+        
+        time.sleep(0.5)
+        #print("X: ", x_acc)
+        #print("Y: ", y_acc)
+        #print("Z: ", z_acc)
     
-    
-    app.exec_()    
-
-
-    
-  
+    app.exec_()
+    """
