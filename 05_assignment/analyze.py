@@ -373,14 +373,7 @@ layout.addWidget(v2, 1, 1)
 
 win.show()
 
-"""
-while True:
-    data= Achsen auslesen
-
-## Set the raw data as the input value to the flowchart
-fc.setInput(dataIn=data)
-"""
-
+MAX_LENGTH = 5
 
 if __name__ == "__main__":
     import time
@@ -401,11 +394,25 @@ if __name__ == "__main__":
     print("Connecting to %s (%s)" % (name, addr))
     wm = connect(addr, name)
     
-    """
+    x_acc = [0]#*MAX_LENGTH
+    y_acc = [0]#*MAX_LENGTH
+    z_acc = [0]#*MAX_LENGTH
+    
     while True:
-        print wm.accelerometer
-        time.sleep(0.05)
-    ###"""
+        # collect accelerometer data of each axis (x,y,z)
+        x_acc.append(wm.accelerometer[0])
+        # trim array to the last "MAX_LENGTH" (e.g. 5) entries
+        x_acc = x_acc[-MAX_LENGTH:]
+        y_acc.append(wm.accelerometer[1])
+        y_acc = y_acc[-MAX_LENGTH:]
+        z_acc.append(wm.accelerometer[2])
+        z_acc = z_acc[-MAX_LENGTH:]
+        
+        time.sleep(0.5)
+        #print("X: ", x_acc)
+        #print("Y: ", y_acc)
+        #print("Z: ", z_acc)
+    
 
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
