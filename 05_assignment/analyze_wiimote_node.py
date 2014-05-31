@@ -372,7 +372,10 @@ class WiiMoteNode(Node):
             self.zData = self.zData[-self.MAX_LENGTH:]
             self.zData.append(data[0])
             print dataIn
-            return {'xOut': self.xData}, {'yOut': self.yData}, {'zOut': self.zData}
+            xOut = self.xData
+            yOut = self.yData
+            zOut = self.zData
+            #return {'xOut': self.xData}, {'yOut': self.yData}, {'zOut': self.zData}
 
 
 KNOWN_DEVICES = ['Nintendo RVL-CNT-01', 'Nintendo RVL-CNT-01-TR']
@@ -433,10 +436,12 @@ if __name__ == "__main__":
     data = wm.accelerometer
     fc.setInput(dataIn=data)
 
+    def update():
+        QtGui.QApplication.processEvents()
     
-    #timer = QtCore.QTimer()
-    #timer.timeout.connect(update)
-    #timer.start(50)
+    timer = QtCore.QTimer()
+    timer.timeout.connect(update)
+    timer.start(50)
     
 
     
@@ -444,3 +449,4 @@ if __name__ == "__main__":
         
     #app.exec_()
     QtGui.QApplication.instance().exec_()
+    
