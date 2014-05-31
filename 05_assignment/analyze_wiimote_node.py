@@ -351,7 +351,7 @@ class WiiMoteNode(Node):
     nodeName = 'WiiMote'
 
     def __init__(self, name):
-        self.MAX_LENGTH = 500
+        self.MAX_LENGTH = 200
         self.xData = []
         self.yData = []
         self.zData = []
@@ -370,8 +370,7 @@ class WiiMoteNode(Node):
             self.yData = self.yData[-self.MAX_LENGTH:]
             self.yData.append(data[1])
             self.zData = self.zData[-self.MAX_LENGTH:]
-            self.zData.append(data[0])
-            print dataIn
+            self.zData.append(data[2])
             return {'xOut': self.xData, 'yOut': self.yData, 'zOut': self.zData}
 
 
@@ -388,31 +387,11 @@ class PlotNode(Node):
     def setPlot(self, plot):
         self.plot = plot
         self.plot.plot(pen='y')
-        self.plot.setRange(yRange=(200, 800))
+        self.plot.setRange(yRange=(20, 980), xRange=(0, 200))
         self.curve = self.plot.plot(pen='y')
 
     def process(self, dataIn, display=True):
         self.curve.setData(dataIn)
-
-## We will define an unsharp masking filter node as a subclass of CtrlNode.
-## CtrlNode is just a convenience class that automatically creates its
-## control widget based on a simple data structure.
-class FilterNode(Node):
-    nodeName = "Filter"
-    
-    def __init__(self, name):
-        ## Define the input / output terminals available on this node
-        terminals = {
-            'dataIn': dict(io='in'),    # each terminal needs at least a name and
-            'dataOut': dict(io='out'),  # to specify whether it is input or output
-        }                              # other more advanced options are available
-                                       # as well..
-        
-        Node.__init__(self, name, terminals=terminals)
-        
-    def process(self, dataIn, display=True):
-        output = dataIn
-        return {'dataOut': output}
 
 KNOWN_DEVICES = ['Nintendo RVL-CNT-01', 'Nintendo RVL-CNT-01-TR']
 
@@ -464,11 +443,13 @@ if __name__ == "__main__":
     layout.addWidget(xPlot, 0, 1)
     layout.addWidget(yPlot, 0, 2)
     layout.addWidget(zPlot, 0, 3)
-    
-    fclib.registerNodeType(FilterNode, [('Display',)])
-    xUnsharpNode = fc.createNode('Filter', pos=(150, -150))
-    yUnsharpNode = fc.createNode('Filter', pos=(300, -150))
-    zUnsharpNode = fc.createNode('Filter', pos=(450, -150))
+
+    xGaussianNode = fc.createNode('GaussianFilter', pos=(150, -150))
+    yGaussianNode = fc.createNode('GaussianFilter', pos=(300, -150))
+    zGaussianNode = fc.createNode('GaussianFilter', pos=(450, -150))
+    xGaussianNode.ctrls['sigma'].setValue(1.3)
+    yGaussianNode.ctrls['sigma'].setValue(1.3)
+    zGaussianNode.ctrls['sigma'].setValue(1.3)
     
     fclib.registerNodeType(PlotNode, [('Display',)])
     xPlotNode = fc.createNode('PlotNode', pos=(150, 150))
@@ -478,12 +459,12 @@ if __name__ == "__main__":
     yPlotNode.setPlot(yPlot)
     zPlotNode.setPlot(zPlot)
     
-    fc.connectTerminals(wiiMoteNode['xOut'], xUnsharpNode['dataIn'])
-    fc.connectTerminals(wiiMoteNode['yOut'], yUnsharpNode['dataIn'])
-    fc.connectTerminals(wiiMoteNode['zOut'], zUnsharpNode['dataIn'])
-    fc.connectTerminals(xUnsharpNode['dataOut'], xPlotNode['dataIn'])
-    fc.connectTerminals(yUnsharpNode['dataOut'], yPlotNode['dataIn'])
-    fc.connectTerminals(zUnsharpNode['dataOut'], zPlotNode['dataIn'])
+    fc.connectTerminals(wiiMoteNode['xOut'], xGaussianNode['In'])
+    fc.connectTerminals(wiiMoteNode['yOut'], yGaussianNode['In'])
+    fc.connectTerminals(wiiMoteNode['zOut'], zGaussianNode['In'])
+    fc.connectTerminals(xGaussianNode['Out'], xPlotNode['dataIn'])
+    fc.connectTerminals(yGaussianNode['Out'], yPlotNode['dataIn'])
+    fc.connectTerminals(zGaussianNode['Out'], zPlotNode['dataIn'])
 
     # display application window
     win.show()
@@ -494,7 +475,7 @@ if __name__ == "__main__":
     
     while True:
         update()
-        time.sleep(0.5)
+        time.sleep(0.05)
         
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
