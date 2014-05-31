@@ -358,9 +358,9 @@ class WiiMoteNode(Node):
         ## Init node with single input terminal
         Node.__init__(self, name, terminals={
             'dataIn': {'io': 'in'},
-            'xOut': {'io': 'out'},
-            'yOut': {'io': 'out'},
-            'zOut': {'io': 'out'}
+            'xOut': dict(io='out'),
+            'yOut': dict(io='out'),
+            'zOut': dict(io='out')
         })
 
     def process(self, dataIn, display=True):
@@ -372,27 +372,47 @@ class WiiMoteNode(Node):
             self.zData = self.zData[-self.MAX_LENGTH:]
             self.zData.append(data[0])
             print dataIn
-            #xOut = self.xData
-            #yOut = self.yData
-            #zOut = self.zData
-            return {'xOut': self.xData}, {'yOut': self.yData}, {'zOut': self.zData}
+            return {'xOut': self.xData, 'yOut': self.yData, 'zOut': self.zData}
+
 
 class PlotNode(Node):
     nodeName = 'PlotNode'
-    
+
     def __init__(self, name):
         self.plot = None
+        self.curve = None
         Node.__init__(self, name, terminals={
             'dataIn': {'io': 'in'}
         })
-        
+
     def setPlot(self, plot):
         self.plot = plot
         self.plot.plot(pen='y')
-        self.plot.setRange(yRange=(200,800))
+        self.plot.setRange(yRange=(200, 800))
+        self.curve = self.plot.plot(pen='y')
+
+    def process(self, dataIn, display=True):
+        self.curve.setData(dataIn)
+
+## We will define an unsharp masking filter node as a subclass of CtrlNode.
+## CtrlNode is just a convenience class that automatically creates its
+## control widget based on a simple data structure.
+class FilterNode(Node):
+    nodeName = "Filter"
+    
+    def __init__(self, name):
+        ## Define the input / output terminals available on this node
+        terminals = {
+            'dataIn': dict(io='in'),    # each terminal needs at least a name and
+            'dataOut': dict(io='out'),  # to specify whether it is input or output
+        }                              # other more advanced options are available
+                                       # as well..
+        
+        Node.__init__(self, name, terminals=terminals)
         
     def process(self, dataIn, display=True):
-        print dataIn
+        output = dataIn
+        return {'dataOut': output}
 
 KNOWN_DEVICES = ['Nintendo RVL-CNT-01', 'Nintendo RVL-CNT-01-TR']
 
@@ -436,7 +456,7 @@ if __name__ == "__main__":
     fc.connectTerminals(fc['dataIn'], wiiMoteNode['dataIn'])
     data = wm.accelerometer
     fc.setInput(dataIn=data)
-    
+
     # three widgets for x-, y- & z-Axis
     xPlot = pg.PlotWidget()
     yPlot = pg.PlotWidget()
@@ -446,31 +466,34 @@ if __name__ == "__main__":
     layout.addWidget(yPlot, 0, 2)
     layout.addWidget(zPlot, 0, 3)
     
+    fclib.registerNodeType(FilterNode, [('Display',)])
+    xUnsharpNode = fc.createNode('Filter', pos=(150, -150))
+    yUnsharpNode = fc.createNode('Filter', pos=(300, -150))
+    zUnsharpNode = fc.createNode('Filter', pos=(450, -150))
+    
     fclib.registerNodeType(PlotNode, [('Display',)])
-    xPlotNode = fc.createNode('PlotNode', pos=(150, -150))
-    yPlotNode = fc.createNode('PlotNode', pos=(150, 0))
-    zPlotNode = fc.createNode('PlotNode', pos=(150, 150))
+    xPlotNode = fc.createNode('PlotNode', pos=(150, 150))
+    yPlotNode = fc.createNode('PlotNode', pos=(300, 150))
+    zPlotNode = fc.createNode('PlotNode', pos=(450, 150))
     xPlotNode.setPlot(xPlot)
     yPlotNode.setPlot(yPlot)
     zPlotNode.setPlot(zPlot)
-    fc.connectTerminals(wiiMoteNode['xOut'], xPlotNode['dataIn'])
-    fc.connectTerminals(wiiMoteNode['yOut'], yPlotNode['dataIn'])
-    fc.connectTerminals(wiiMoteNode['zOut'], zPlotNode['dataIn'])
     
+    fc.connectTerminals(wiiMoteNode['xOut'], xUnsharpNode['dataIn'])
+    fc.connectTerminals(wiiMoteNode['yOut'], yUnsharpNode['dataIn'])
+    fc.connectTerminals(wiiMoteNode['zOut'], zUnsharpNode['dataIn'])
+    fc.connectTerminals(xUnsharpNode['dataOut'], xPlotNode['dataIn'])
+    fc.connectTerminals(yUnsharpNode['dataOut'], yPlotNode['dataIn'])
+    fc.connectTerminals(zUnsharpNode['dataOut'], zPlotNode['dataIn'])
+
     # display application window
     win.show()
 
     def update():
         QtGui.QApplication.processEvents()
     
-    timer = QtCore.QTimer()
-    timer.timeout.connect(update)
-    timer.start(50)
-    
-
-    
-    #fc.setInput(dataIn=wm.accelerometer)
+    while True:
+        update()
+        time.sleep(0.05)
         
-    #app.exec_()
     QtGui.QApplication.instance().exec_()
-    
