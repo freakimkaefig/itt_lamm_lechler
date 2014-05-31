@@ -450,7 +450,7 @@ if __name__ == "__main__":
     xGaussianNode.ctrls['sigma'].setValue(1.3)
     yGaussianNode.ctrls['sigma'].setValue(1.3)
     zGaussianNode.ctrls['sigma'].setValue(1.3)
-    
+
     fclib.registerNodeType(PlotNode, [('Display',)])
     xPlotNode = fc.createNode('PlotNode', pos=(150, 150))
     yPlotNode = fc.createNode('PlotNode', pos=(300, 150))
@@ -458,7 +458,7 @@ if __name__ == "__main__":
     xPlotNode.setPlot(xPlot)
     yPlotNode.setPlot(yPlot)
     zPlotNode.setPlot(zPlot)
-    
+
     fc.connectTerminals(wiiMoteNode['xOut'], xGaussianNode['In'])
     fc.connectTerminals(wiiMoteNode['yOut'], yGaussianNode['In'])
     fc.connectTerminals(wiiMoteNode['zOut'], zGaussianNode['In'])
@@ -472,10 +472,10 @@ if __name__ == "__main__":
     def update():
         fc.setInput(dataIn=data)
         pg.QtGui.QApplication.processEvents()
-    
+
     while True:
         update()
         time.sleep(0.05)
-        
+
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
