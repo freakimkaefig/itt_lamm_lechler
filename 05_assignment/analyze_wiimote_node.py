@@ -455,7 +455,6 @@ if __name__ == "__main__":
     wiiMoteNode = fc.createNode('WiiMote', pos=(0, 0))
     fc.connectTerminals(fc['dataIn'], wiiMoteNode['dataIn'])
     data = wm.accelerometer
-    fc.setInput(dataIn=data)
 
     # three widgets for x-, y- & z-Axis
     xPlot = pg.PlotWidget()
@@ -490,10 +489,12 @@ if __name__ == "__main__":
     win.show()
 
     def update():
-        QtGui.QApplication.processEvents()
+        fc.setInput(dataIn=data)
+        pg.QtGui.QApplication.processEvents()
     
     while True:
         update()
-        time.sleep(0.05)
+        time.sleep(0.5)
         
-    QtGui.QApplication.instance().exec_()
+    if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
+        QtGui.QApplication.instance().exec_()
