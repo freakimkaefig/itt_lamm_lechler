@@ -372,11 +372,27 @@ class WiiMoteNode(Node):
             self.zData = self.zData[-self.MAX_LENGTH:]
             self.zData.append(data[0])
             print dataIn
-            xOut = self.xData
-            yOut = self.yData
-            zOut = self.zData
-            #return {'xOut': self.xData}, {'yOut': self.yData}, {'zOut': self.zData}
+            #xOut = self.xData
+            #yOut = self.yData
+            #zOut = self.zData
+            return {'xOut': self.xData}, {'yOut': self.yData}, {'zOut': self.zData}
 
+class PlotNode(Node):
+    nodeName = 'PlotNode'
+    
+    def __init__(self, name):
+        self.plot = None
+        Node.__init__(self, name, terminals={
+            'dataIn': {'io': 'in'}
+        })
+        
+    def setPlot(self, plot):
+        self.plot = plot
+        self.plot.plot(pen='y')
+        self.plot.setRange(yRange=(200,800))
+        
+    def process(self, dataIn, display=True):
+        print dataIn
 
 KNOWN_DEVICES = ['Nintendo RVL-CNT-01', 'Nintendo RVL-CNT-01-TR']
 
@@ -400,18 +416,6 @@ if __name__ == "__main__":
     w = fc.widget()
     layout.addWidget(fc.widget(), 0, 0, 2, 1)
 
-    # PlotWidgets erstmal raus, werden eh nicht mit Daten beliefert
-    """
-    # three widgets for x-, y- & z-Axis
-    x = pg.PlotWidget()
-    y = pg.PlotWidget()
-    z = pg.PlotWidget()
-    # add widgets to grid layout
-    layout.addWidget(x, 0, 1)
-    layout.addWidget(y, 0, 2)
-    layout.addWidget(z, 0, 3)
-    """
-
     raw_input("Press the 'sync' button on the back of your Wiimote Plus " +
               "or buttons (1) and (2) on your classic Wiimote.\n" +
               "Press <return> once the Wiimote's LEDs start blinking.")
@@ -426,15 +430,35 @@ if __name__ == "__main__":
     print("Connecting to %s (%s)" % (name, addr))
     wm = connect(addr, name)
 
-    # display application window
-    win.show()
-
     #
     fclib.registerNodeType(WiiMoteNode, [('Display',)])
     wiiMoteNode = fc.createNode('WiiMote', pos=(0, 0))
     fc.connectTerminals(fc['dataIn'], wiiMoteNode['dataIn'])
     data = wm.accelerometer
     fc.setInput(dataIn=data)
+    
+    # three widgets for x-, y- & z-Axis
+    xPlot = pg.PlotWidget()
+    yPlot = pg.PlotWidget()
+    zPlot = pg.PlotWidget()
+    # add widgets to grid layout
+    layout.addWidget(xPlot, 0, 1)
+    layout.addWidget(yPlot, 0, 2)
+    layout.addWidget(zPlot, 0, 3)
+    
+    fclib.registerNodeType(PlotNode, [('Display',)])
+    xPlotNode = fc.createNode('PlotNode', pos=(150, -150))
+    yPlotNode = fc.createNode('PlotNode', pos=(150, 0))
+    zPlotNode = fc.createNode('PlotNode', pos=(150, 150))
+    xPlotNode.setPlot(xPlot)
+    yPlotNode.setPlot(yPlot)
+    zPlotNode.setPlot(zPlot)
+    fc.connectTerminals(wiiMoteNode['xOut'], xPlotNode['dataIn'])
+    fc.connectTerminals(wiiMoteNode['yOut'], yPlotNode['dataIn'])
+    fc.connectTerminals(wiiMoteNode['zOut'], zPlotNode['dataIn'])
+    
+    # display application window
+    win.show()
 
     def update():
         QtGui.QApplication.processEvents()
