@@ -36,6 +36,7 @@ class BufferNode(CtrlNode):
         size = int(self.ctrls['size'].value())
         self._buffer = np.append(self._buffer, kwds['dataIn'])
         self._buffer = self._buffer[-size:]
+        # output = map(int, self._buffer)
         output = self._buffer
         return {'dataOut': output}
 
@@ -84,7 +85,13 @@ class WiimoteNode(Node):
         self.layout.addWidget(self.connect_button)
         self.ui.setLayout(self.layout)
         self.connect_button.clicked.connect(self.connect_wiimote)
-        self.btaddr = "18:2a:7b:f3:f1:68" # for ease of use
+        # pass wiimotes bluetooth mac adress as param...
+        if len(sys.argv) == 2:
+            # print("args.: ", sys.argv[1])
+            self.btaddr = sys.argv[1]
+        else:
+            # ...or hard-code it here
+            self.btaddr = "B8:AE:6E:1B:A3:9B"
         self.text.setText(self.btaddr)
         self.update_timer = QtCore.QTimer()
         self.update_timer.timeout.connect(self.update_all_sensors)
@@ -101,24 +108,26 @@ class WiimoteNode(Node):
         # IRCamera sensor
         ir = self.wiimote.ir
         if ir:
-            # calculating most intense IR light source (by size??)
+            # calculating most intense IR light source (by size???)
+            # denke eher durchschnitt von allen (je nach getätigter einstellung über '+' und '-' im bufferNode)???
             maxLight = max(ir, key=lambda x:x['size'])
             self._ir_vals = (maxLight['x'], maxLight['y'])
             print self._ir_vals
+            spi.setData(pos=[self._ir_vals[0],self._ir_vals[0]], size=10, pxMode=True) # throws error: 'int object has no attribute __getitem__
 
         self.update()
 
     def update_accel(self, acc_vals):
         self._acc_vals = acc_vals
         self.update()
-        
+
     def update_ir(self, ir_vals):
         self._ir_vals = ir_vals
         self.update()    
 
     def ctrlWidget(self):
         return self.ui
-        
+
     def connect_wiimote(self):
         self.btaddr = str(self.text.text()).strip()
         if self.wiimote is not None:
@@ -149,14 +158,14 @@ class WiimoteNode(Node):
         x,y,z = self._acc_vals
         ir = self._ir_vals
         return {'accelX': np.array([x]), 'accelY': np.array([y]), 'accelZ': np.array([z]), 'ir': np.array([ir])}
-        
+
 fclib.registerNodeType(WiimoteNode, [('Sensor',)])
-    
+
 if __name__ == '__main__':
     import sys
     app = QtGui.QApplication([])
     win = QtGui.QMainWindow()
-    win.setWindowTitle('WiimoteNode demo')
+    win.setWindowTitle('Wiipoint 2D')
     cw = QtGui.QWidget()
     win.setCentralWidget(cw)
     layout = QtGui.QGridLayout()
@@ -168,29 +177,44 @@ if __name__ == '__main__':
         'dataOut': {'io': 'out'}    
     })
     w = fc.widget()
-
+    
     layout.addWidget(fc.widget(), 0, 0, 2, 1)
+    
+    view = pg.GraphicsLayoutWidget()
+    layout.addWidget(view, 0, 1, 2, 1)  
+    
+    #pw1 = pg.PlotWidget()
+    #layout.addWidget(pw1, 0, 1)
+    #pw1.setYRange(0,1024)
 
-    pw1 = pg.PlotWidget()
-    layout.addWidget(pw1, 0, 1)
-    pw1.setYRange(0,1024)
-
-    pw1Node = fc.createNode('PlotWidget', pos=(0, -150))
-    pw1Node.setPlot(pw1)
+    #pw1Node = fc.createNode('PlotWidget', pos=(0, -150))
+    #pw1Node.setPlot(pw1)
 
     wiimoteNode = fc.createNode('Wiimote', pos=(0, 0), )
-    bufferNode = fc.createNode('Buffer', pos=(150, 0))
+    #bufferNode = fc.createNode('Buffer', pos=(0, -150))
 
-    fc.connectTerminals(wiimoteNode['accelX'], bufferNode['dataIn'])
-    fc.connectTerminals(bufferNode['dataOut'], pw1Node['In'])
+    #fc.connectTerminals(wiimoteNode['accelX'], bufferNode['dataIn'])
+    #fc.connectTerminals(bufferNode['dataOut'], pw1Node['In'])
+    
     
     # connect ir camera
-    spw1 = pg.ScatterPlotWidget()
-    layout.addWidget(spw1, 0, 2)
+    plotter = view.addPlot()
+    spi = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 255))
+    plotter.addItem(spi)
+    plotter.setXRange(0, 1500)
+    plotter.setYRange(0, 1500)
+    ########
+    # see:
+    #
+    # https://github.com/lcampagn/pyqtgraph/blob/master/examples/ScatterPlot.py#L22
+    ########
+    #layout.addItem(spw1, 0, 1) # throws error
+    
     bufferNodeIr = fc.createNode('Buffer', pos=(150, 150))
-    spw1Node = fc.createNode('PlotWidget', pos=(300, 150))
+    #spw1Node = fc.createNode('PlotWidget', pos=(300, 150)) # sollte eigener Node werdn der durchschnitt von x/y berechnet, aufteilt und
+                                                            # an scatterPlotItem übergit
     fc.connectTerminals(wiimoteNode['ir'], bufferNodeIr['dataIn'])
-    fc.connectTerminals(bufferNodeIr['dataOut'], spw1Node['In'])
+    #fc.connectTerminals(bufferNodeIr['dataOut'], spw1Node['In']) # s.o.
     
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
