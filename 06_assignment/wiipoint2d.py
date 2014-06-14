@@ -16,7 +16,7 @@ class BufferNode(CtrlNode):
     """
     Buffers the last n samples provided on input and provides them as a list of
     length n on output.
-    A spinbox widget allows for setting the size of the buffer. 
+    A spinbox widget allows for setting the size of the buffer.
     Default size is 32 samples.
     """
     nodeName = "Buffer"
@@ -26,52 +26,59 @@ class BufferNode(CtrlNode):
 
     def __init__(self, name):
         terminals = {
-            'dataIn': dict(io='in'),  
-            'dataOut': dict(io='out'), 
+            'dataIn': dict(io='in'),
+            'dataOut': dict(io='out'),
         }
         self._buffer = np.array([])
         CtrlNode.__init__(self, name, terminals=terminals)
-        
-    def increaseBufferSize(self):
-        print "increase"
-        
-    def decreaseBufferSize(self):
-        print "decrease"
-        
+
+    def increase_buffer_size(self):
+        size = self.ctrls['size'].value()
+        self.ctrls['size'].setValue(size + 1.0)
+
+    def decrease_buffer_size(self):
+        if self.ctrls['size'].value() > 0:
+            size = self.ctrls['size'].value()
+            self.ctrls['size'].setValue(size - 1.0)
+
     def process(self, **kwds):
         size = int(self.ctrls['size'].value())
+        #print kwds['dataIn']
         self._buffer = np.append(self._buffer, kwds['dataIn'])
         self._buffer = self._buffer[-size:]
         # output = map(int, self._buffer)
-        # print self._buffer
+        #print self._buffer
         output = self._buffer
         return {'dataOut': output}
 
 fclib.registerNodeType(BufferNode, [('Data',)])
-        
+
+
 class WiimoteNode(Node):
     """
     Outputs sensor data from a Wiimote.
-    
+
     Supported sensors: accelerometer (3 axis)
-    Text input box allows for setting a Bluetooth MAC address. 
+    Text input box allows for setting a Bluetooth MAC address.
     Pressing the "connect" button tries connecting to the Wiimote.
-    Update rate can be changed via a spinbox widget. Setting it to "0" 
+    Update rate can be changed via a spinbox widget. Setting it to "0"
     activates callbacks everytime a new sensor value arrives (which is
     quite often -> performance hit)
     """
     nodeName = "Wiimote"
-    
+
     def __init__(self, name):
         terminals = {
-            'accelX': dict(io='out'),  
-            'accelY': dict(io='out'), 
+            'accelX': dict(io='out'),
+            'accelY': dict(io='out'),
             'accelZ': dict(io='out'),
             'ir': dict(io='out'),
         }
         self.wiimote = None
         self._acc_vals = []
         self._ir_vals = []
+        self._buttons = []
+        self.bufferNode = None
         self.ui = QtGui.QWidget()
         self.layout = QtGui.QGridLayout()
 
@@ -102,40 +109,40 @@ class WiimoteNode(Node):
         self.text.setText(self.btaddr)
         self.update_timer = QtCore.QTimer()
         self.update_timer.timeout.connect(self.update_all_sensors)
-    
+
         Node.__init__(self, name, terminals=terminals)
-        
 
     def update_all_sensors(self):
-        if self.wiimote == None:
+        if self.wiimote is None:
             return
+        # Accelerometer
         self._acc_vals = self.wiimote.accelerometer
-        # todo: other sensors...
-
         # IRCamera sensor
         self._ir_vals = self.wiimote.ir
-        #print self._ir_vals
-        
         # Buttons
-        self.wiimote.buttons.register_callback(self.buttons)
+        self._buttons = self.wiimote.buttons
+        #self.wiimote.buttons.register_callback(self.buttons)
+        # todo: other sensors...
 
         self.update()
+
+    def set_buffer_node(self, bufferNode):
+        self.bufferNode = bufferNode
 
     def update_accel(self, acc_vals):
         self._acc_vals = acc_vals
         self.update()
-        
-    def buttons(self, buttons):
-        #print buttons
-        #print self.wiimote.buttons
-        if self.wiimote.buttons['Minus']:
-            print "MINUS"
-        if self.wiimote.buttons['Plus']:
-            print "PLUS"
+  
+    def update_buttons(self, buttons):
+        if buttons:
+            if buttons[0] == ('Minus', True):
+                self.bufferNode.decrease_buffer_size()
+            if buttons[0] == ('Plus', True):
+                self.bufferNode.increase_buffer_size()
 
     def update_ir(self, ir_vals):
         self._ir_vals = ir_vals
-        self.update()    
+        self.update()
 
     def ctrlWidget(self):
         return self.ui
@@ -146,18 +153,18 @@ class WiimoteNode(Node):
             self.wiimote.disconnect()
             self.wiimote = None
             self.connect_button.setText("connect")
-            return 
-        if len(self.btaddr) == 17 :
+            return
+        if len(self.btaddr) == 17:
             self.connect_button.setText("connecting...")
             self.wiimote = wiimote.connect(self.btaddr)
-            if self.wiimote == None:
+            if self.wiimote is None:
                 self.connect_button.setText("try again")
             else:
                 self.connect_button.setText("disconnect")
                 self.set_update_rate(self.update_rate_input.value())
 
     def set_update_rate(self, rate):
-        if rate == 0: # use callbacks for max. update rate
+        if rate == 0:  # use callbacks for max. update rate
             self.wiimote.accelerometer.register_callback(self.update_accel)
             self.wiimote.ir.register_callback(self.update_ir)
             self.update_timer.stop()
@@ -165,18 +172,21 @@ class WiimoteNode(Node):
             self.wiimote.accelerometer.unregister_callback(self.update_accel)
             self.wiimote.ir.unregister_callback(self.update_ir)
             self.update_timer.start(1000.0/rate)
+        self.wiimote.buttons.register_callback(self.update_buttons)
 
     def process(self, **kwdargs):
-        x,y,z = self._acc_vals
+        x, y, z = self._acc_vals
         ir = self._ir_vals
-        return {'accelX': np.array([x]), 'accelY': np.array([y]), 'accelZ': np.array([z]), 'ir': np.array([ir])}
+        return {'accelX': np.array([x]), 'accelY': np.array([y]),
+                'accelZ': np.array([z]), 'ir': np.array([ir])}
+
 
 class IrPlotNode(Node):
     """
     Plots ir sensor data data from a Wiimote
     """
     nodeName = "IrPlotNode"
-    
+
     def __init__(self, name):
         terminals = {
             'irData': dict(io='in'),
@@ -186,41 +196,39 @@ class IrPlotNode(Node):
         self._ir_vals = []
         self._xy_vals = []
         self.plot = None
+        self.spi = None
         self.avg_val = (0, 0)
-        
+
         Node.__init__(self, name, terminals=terminals)
-        
+
     def calculate_max_light(self, ir):
-        #print "CALC ir", ir
-        #if ir:
         self._xy_vals = []
-        maxLight = max(ir, key=lambda x:x['size'])
-        #print "Max Light", maxLight
+        maxLight = max(ir, key=lambda x: x['size'])
         for val in ir:
-            #print "VAL", val
-            #print "MAX", maxLight
-            #print "IDS", val['id'], maxLight['id']
             if int(maxLight['id']) == int(val['id']):
                 self._xy_vals.append((val['x'], val['y']))
                 #print "XY", self._xy_vals
                 x = self._xy_vals
-                self.avg_val = tuple(map(lambda y: sum(y) / float(len(y)), zip(*x)))
+                self.avg_val = tuple(map(lambda y: sum(y) / float(len(y)),
+                                         zip(*x)))
                 self.plotVal(self.avg_val)
-    
+
     def plotVal(self, val):
-        spi = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 255))
+        #print val
+        self.spi.clear()
         points = [{'pos': [val[0], val[1]], 'data': 1}]
-        spi.addPoints(points)
-        self.plot.addItem(spi)
-        
+        self.spi.addPoints(points)
+        self.plot.addItem(self.spi)
+
     def setPlot(self, plot):
         self.plot = plot
-        
-        #spi = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 255))
-        #self.plot.addItem(spi)
+        self.spi = pg.ScatterPlotItem(size=10,
+                                      pen=pg.mkPen(None),
+                                      brush=pg.mkBrush(255, 255, 255, 255))
+
         self.plot.setXRange(0, 1500)
         self.plot.setYRange(0, 1500)
-        
+
     def process(self, irData):
         self._ir_vals = irData
         self.calculate_max_light(self._ir_vals)
@@ -243,29 +251,29 @@ if __name__ == '__main__':
     ## Create an empty flowchart with a single input and output
     fc = Flowchart(terminals={
         'dataIn': {'io': 'in'},
-        'dataOut': {'io': 'out'}    
+        'dataOut': {'io': 'out'}
     })
     w = fc.widget()
-    
+
     layout.addWidget(fc.widget(), 0, 0, 2, 1)
-    
+
     view = pg.GraphicsLayoutWidget()
-    layout.addWidget(view, 0, 1, 2, 1)  
+    layout.addWidget(view, 0, 1, 2, 1)
 
     wiimoteNode = fc.createNode('Wiimote', pos=(0, 0), )
     bufferNodeIr = fc.createNode('Buffer', pos=(150, 150))
     irPlotNode = fc.createNode('IrPlotNode', pos=(300, 150))
-    
+
+    # connect 'Plus' and 'Minus' buttons
+    wiimoteNode.set_buffer_node(bufferNodeIr)
+
     # connect ir camera
     plotter = view.addPlot()
     irPlotNode.setPlot(plotter)
-    
-    #spw1Node = fc.createNode('PlotWidget', pos=(300, 150)) # sollte eigener Node werdn der durchschnitt von x/y berechnet, aufteilt und
-                                                            # an scatterPlotItem übergit
+
     fc.connectTerminals(wiimoteNode['ir'], bufferNodeIr['dataIn'])
     fc.connectTerminals(bufferNodeIr['dataOut'], irPlotNode['irData'])
-    #fc.connectTerminals(bufferNodeIr['dataOut'], spw1Node['In']) # s.o.
-    
+
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
