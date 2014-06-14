@@ -132,7 +132,7 @@ class WiimoteNode(Node):
     def update_accel(self, acc_vals):
         self._acc_vals = acc_vals
         self.update()
-  
+
     def update_buttons(self, buttons):
         if buttons:
             if buttons[0] == ('Minus', True):
