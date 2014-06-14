@@ -32,11 +32,18 @@ class BufferNode(CtrlNode):
         self._buffer = np.array([])
         CtrlNode.__init__(self, name, terminals=terminals)
         
+    def increaseBufferSize(self):
+        print "increase"
+        
+    def decreaseBufferSize(self):
+        print "decrease"
+        
     def process(self, **kwds):
         size = int(self.ctrls['size'].value())
         self._buffer = np.append(self._buffer, kwds['dataIn'])
         self._buffer = self._buffer[-size:]
         # output = map(int, self._buffer)
+        # print self._buffer
         output = self._buffer
         return {'dataOut': output}
 
@@ -106,20 +113,25 @@ class WiimoteNode(Node):
         # todo: other sensors...
 
         # IRCamera sensor
-        ir = self.wiimote.ir
-        if ir:
-            # calculating most intense IR light source (by size???)
-            # denke eher durchschnitt von allen (je nach getätigter einstellung über '+' und '-' im bufferNode)???
-            maxLight = max(ir, key=lambda x:x['size'])
-            self._ir_vals = (maxLight['x'], maxLight['y'])
-            print self._ir_vals
-            spi.setData(pos=[self._ir_vals[0],self._ir_vals[0]], size=10, pxMode=True) # throws error: 'int object has no attribute __getitem__
+        self._ir_vals = self.wiimote.ir
+        #print self._ir_vals
+        
+        # Buttons
+        self.wiimote.buttons.register_callback(self.buttons)
 
         self.update()
 
     def update_accel(self, acc_vals):
         self._acc_vals = acc_vals
         self.update()
+        
+    def buttons(self, buttons):
+        #print buttons
+        #print self.wiimote.buttons
+        if self.wiimote.buttons['Minus']:
+            print "MINUS"
+        if self.wiimote.buttons['Plus']:
+            print "PLUS"
 
     def update_ir(self, ir_vals):
         self._ir_vals = ir_vals
@@ -159,7 +171,64 @@ class WiimoteNode(Node):
         ir = self._ir_vals
         return {'accelX': np.array([x]), 'accelY': np.array([y]), 'accelZ': np.array([z]), 'ir': np.array([ir])}
 
+class IrPlotNode(Node):
+    """
+    Plots ir sensor data data from a Wiimote
+    """
+    nodeName = "IrPlotNode"
+    
+    def __init__(self, name):
+        terminals = {
+            'irData': dict(io='in'),
+            'xOut': dict(io='out'),
+            'yOut': dict(io='out'),
+        }
+        self._ir_vals = []
+        self._xy_vals = []
+        self.plot = None
+        self.avg_val = (0, 0)
+        
+        Node.__init__(self, name, terminals=terminals)
+        
+    def calculate_max_light(self, ir):
+        #print "CALC ir", ir
+        #if ir:
+        self._xy_vals = []
+        maxLight = max(ir, key=lambda x:x['size'])
+        #print "Max Light", maxLight
+        for val in ir:
+            #print "VAL", val
+            #print "MAX", maxLight
+            #print "IDS", val['id'], maxLight['id']
+            if int(maxLight['id']) == int(val['id']):
+                self._xy_vals.append((val['x'], val['y']))
+                #print "XY", self._xy_vals
+                x = self._xy_vals
+                self.avg_val = tuple(map(lambda y: sum(y) / float(len(y)), zip(*x)))
+                self.plotVal(self.avg_val)
+    
+    def plotVal(self, val):
+        spi = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 255))
+        points = [{'pos': [val[0], val[1]], 'data': 1}]
+        spi.addPoints(points)
+        self.plot.addItem(spi)
+        
+    def setPlot(self, plot):
+        self.plot = plot
+        
+        #spi = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 255))
+        #self.plot.addItem(spi)
+        self.plot.setXRange(0, 1500)
+        self.plot.setYRange(0, 1500)
+        
+    def process(self, irData):
+        self._ir_vals = irData
+        self.calculate_max_light(self._ir_vals)
+        return {'xOut': 1, 'yOut': 2}
+
+
 fclib.registerNodeType(WiimoteNode, [('Sensor',)])
+fclib.registerNodeType(IrPlotNode, [('Display',)])
 
 if __name__ == '__main__':
     import sys
@@ -182,38 +251,19 @@ if __name__ == '__main__':
     
     view = pg.GraphicsLayoutWidget()
     layout.addWidget(view, 0, 1, 2, 1)  
-    
-    #pw1 = pg.PlotWidget()
-    #layout.addWidget(pw1, 0, 1)
-    #pw1.setYRange(0,1024)
-
-    #pw1Node = fc.createNode('PlotWidget', pos=(0, -150))
-    #pw1Node.setPlot(pw1)
 
     wiimoteNode = fc.createNode('Wiimote', pos=(0, 0), )
-    #bufferNode = fc.createNode('Buffer', pos=(0, -150))
-
-    #fc.connectTerminals(wiimoteNode['accelX'], bufferNode['dataIn'])
-    #fc.connectTerminals(bufferNode['dataOut'], pw1Node['In'])
-    
+    bufferNodeIr = fc.createNode('Buffer', pos=(150, 150))
+    irPlotNode = fc.createNode('IrPlotNode', pos=(300, 150))
     
     # connect ir camera
     plotter = view.addPlot()
-    spi = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 255))
-    plotter.addItem(spi)
-    plotter.setXRange(0, 1500)
-    plotter.setYRange(0, 1500)
-    ########
-    # see:
-    #
-    # https://github.com/lcampagn/pyqtgraph/blob/master/examples/ScatterPlot.py#L22
-    ########
-    #layout.addItem(spw1, 0, 1) # throws error
+    irPlotNode.setPlot(plotter)
     
-    bufferNodeIr = fc.createNode('Buffer', pos=(150, 150))
     #spw1Node = fc.createNode('PlotWidget', pos=(300, 150)) # sollte eigener Node werdn der durchschnitt von x/y berechnet, aufteilt und
                                                             # an scatterPlotItem übergit
     fc.connectTerminals(wiimoteNode['ir'], bufferNodeIr['dataIn'])
+    fc.connectTerminals(bufferNodeIr['dataOut'], irPlotNode['irData'])
     #fc.connectTerminals(bufferNodeIr['dataOut'], spw1Node['In']) # s.o.
     
     win.show()
