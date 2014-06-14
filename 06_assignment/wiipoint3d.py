@@ -8,6 +8,7 @@ import pyqtgraph.flowchart.library as fclib
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import numpy as np
+import math
 
 import wiimote
 
@@ -132,7 +133,7 @@ class WiimoteNode(Node):
     def update_accel(self, acc_vals):
         self._acc_vals = acc_vals
         self.update()
-  
+
     def update_buttons(self, buttons):
         if buttons:
             if buttons[0] == ('Minus', True):
@@ -198,15 +199,31 @@ class IrPlotNode(Node):
         self.plot = None
         self.spi = None
         self.avg_vals = []
+        self.THETA_FOV = 0.04020182291
+        self.DISTANCE = 21
 
         Node.__init__(self, name, terminals=terminals)
+
+    #http://wiiphysics.site88.net/physics.html
+    def get_distance(self, x1, x2, y1, y2):
+        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+
+    def get_alpha_angle(self, x1, x2, y1, y2):
+        num = self.THETA_FOV * self.get_distance(x1, x2, y1, y2)
+        den = 4
+        return num / den
+
+    def get_wiimote_distance(self, x1, x2, y1, y2):
+        num = self.DISTANCE
+        den = (2 * math.tan(self.get_alpha_angle(x1, x2, y1, y2)))
+        return num / den
 
     def calculate_max_light(self, ir):
         #print ir
         self.avg_vals = []
         self._xy_vals = []
         adj_ir = []
-        
+
         # calculate first max light
         firstMaxLight = max(ir, key=lambda x: x['size'])
         for val in ir:
@@ -216,7 +233,7 @@ class IrPlotNode(Node):
                 adj_ir.append(val)
         x = self._xy_vals
         self.avg_vals.append(tuple(map(lambda y: sum(y) / float(len(y)),
-                                 zip(*x))))
+                                       zip(*x))))
 
         # calculate second max light
         #print adj_ir
@@ -228,14 +245,39 @@ class IrPlotNode(Node):
                     self._xy_vals.append((val['x'], val['y']))
             x = self._xy_vals
             self.avg_vals.append(tuple(map(lambda y: sum(y) / float(len(y)),
-                                     zip(*x))))
-    
-        # plot both light sources
+                                           zip(*x))))
+
+        if len(self.avg_vals) > 1:
+            # calculate dot size
+            self.calculate_dot_size(self.avg_vals)
+        # plot light sources
         self.plotVals(self.avg_vals)
-        
+
     def change_dot_size(self, size):
-        print "change size"
-        self.spi.setSize(size)
+        #print "change size"
+        if size > 0:
+            self.spi.setSize(size)
+
+    def calculate_dot_size(self, vals):
+        counter = 0
+        x1 = 0
+        y1 = 0
+        x2 = 0
+        y2 = 0
+        #print "calculating distance with: ",vals, len(vals)
+        for i in vals:
+            if(counter == 0):
+                x1 = i[0]
+                y1 = i[1]
+                counter += 1
+            elif(counter == 1):
+                x2 = i[0]
+                y2 = i[1]
+                counter += 1
+        #print "x1: ",  x1, " y1: ", y1, " x2: ", x2, " y2: ", y2
+        wii_distance = self.get_wiimote_distance(x1, x2, y1, y2)
+        print "wii distance: ", wii_distance
+        self.change_dot_size(int(wii_distance / 10))
 
     def plotVals(self, vals):
         self.spi.clear()
