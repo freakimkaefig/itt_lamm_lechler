@@ -197,26 +197,53 @@ class IrPlotNode(Node):
         self._xy_vals = []
         self.plot = None
         self.spi = None
-        self.avg_val = (0, 0)
+        self.avg_vals = []
 
         Node.__init__(self, name, terminals=terminals)
 
     def calculate_max_light(self, ir):
+        #print ir
+        self.avg_vals = []
         self._xy_vals = []
-        maxLight = max(ir, key=lambda x: x['size'])
+        adj_ir = []
+        
+        # calculate first max light
+        firstMaxLight = max(ir, key=lambda x: x['size'])
         for val in ir:
-            if int(maxLight['id']) == int(val['id']):
+            if int(firstMaxLight['id']) == int(val['id']):
                 self._xy_vals.append((val['x'], val['y']))
-
+            else:
+                adj_ir.append(val)
         x = self._xy_vals
-        self.avg_val = tuple(map(lambda y: sum(y) / float(len(y)),
-                                 zip(*x)))
-        self.plotVal(self.avg_val)
+        self.avg_vals.append(tuple(map(lambda y: sum(y) / float(len(y)),
+                                 zip(*x))))
 
-    def plotVal(self, val):
-        #print val
+        # calculate second max light
+        #print adj_ir
+        if adj_ir:
+            self._xy_vals = []
+            secondMaxLight = max(adj_ir, key=lambda x: x['size'])
+            for val in adj_ir:
+                if int(secondMaxLight['id']) == int(val['id']):
+                    self._xy_vals.append((val['x'], val['y']))
+            x = self._xy_vals
+            self.avg_vals.append(tuple(map(lambda y: sum(y) / float(len(y)),
+                                     zip(*x))))
+    
+        # plot both light sources
+        self.plotVals(self.avg_vals)
+        
+    def change_dot_size(self, size):
+        print "change size"
+        self.spi.setSize(size)
+
+    def plotVals(self, vals):
         self.spi.clear()
-        points = [{'pos': [val[0], val[1]], 'data': 1}]
+        points = []
+        counter = 1
+        for point in vals:
+            points.append({'pos': [point[0], point[1]], 'data': counter})
+            counter += 1
         self.spi.addPoints(points)
         self.plot.addItem(self.spi)
 
