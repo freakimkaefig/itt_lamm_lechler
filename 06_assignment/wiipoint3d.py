@@ -193,7 +193,7 @@ class IrPlotNode(Node):
         self.spi = None
         self.avg_vals = []
         self.THETA_FOV = 0.04020182291
-        self.DISTANCE = 100
+        self.DISTANCE = 1000
         # at ~20 cm distance between candles in test setup
 
         Node.__init__(self, name, terminals=terminals)
@@ -266,8 +266,8 @@ class IrPlotNode(Node):
                 y2 = i[1]
                 counter += 1
         wii_distance = self.get_wiimote_distance(x1, x2, y1, y2)
-        print "wii distance: ", wii_distance, "mm"
-        dot_size = int(100000 / wii_distance)
+        #print "wii distance: ", wii_distance
+        dot_size = int((1000 * self.DISTANCE) / wii_distance)
         self.change_dot_size(dot_size)
 
     def plotVals(self, vals):
