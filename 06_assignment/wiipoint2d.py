@@ -190,8 +190,6 @@ class IrPlotNode(Node):
     def __init__(self, name):
         terminals = {
             'irData': dict(io='in'),
-            'xOut': dict(io='out'),
-            'yOut': dict(io='out'),
         }
         self._ir_vals = []
         self._xy_vals = []
@@ -226,13 +224,12 @@ class IrPlotNode(Node):
                                       pen=pg.mkPen(None),
                                       brush=pg.mkBrush(255, 255, 255, 255))
 
-        self.plot.setXRange(0, 1500)
-        self.plot.setYRange(0, 1500)
+        self.plot.setXRange(0, 1024)
+        self.plot.setYRange(0, 768)
 
     def process(self, irData):
         self._ir_vals = irData
         self.calculate_max_light(self._ir_vals)
-        return {'xOut': 1, 'yOut': 2}
 
 
 fclib.registerNodeType(WiimoteNode, [('Sensor',)])

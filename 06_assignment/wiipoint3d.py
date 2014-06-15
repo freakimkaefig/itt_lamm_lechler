@@ -186,8 +186,6 @@ class IrPlotNode(Node):
     def __init__(self, name):
         terminals = {
             'irData': dict(io='in'),
-            'xOut': dict(io='out'),
-            'yOut': dict(io='out'),
         }
         self._ir_vals = []
         self._xy_vals = []
@@ -195,14 +193,14 @@ class IrPlotNode(Node):
         self.spi = None
         self.avg_vals = []
         self.THETA_FOV = 0.04020182291
-        self.DISTANCE = 1000
+        self.DISTANCE = 100
         # at ~20 cm distance between candles in test setup
 
         Node.__init__(self, name, terminals=terminals)
 
     # from: http://wiiphysics.site88.net/physics.html
     def get_distance(self, x1, x2, y1, y2):
-        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+        return math.sqrt(((x1 - x2)**2) + ((y1 - y2)**2))
 
     def get_alpha_angle(self, x1, x2, y1, y2):
         num = self.THETA_FOV * self.get_distance(x1, x2, y1, y2)
@@ -268,9 +266,9 @@ class IrPlotNode(Node):
                 y2 = i[1]
                 counter += 1
         wii_distance = self.get_wiimote_distance(x1, x2, y1, y2)
-        print "wii distance: ", wii_distance
-        print "dot size: ", int(wii_distance / 40)
-        self.change_dot_size(int(wii_distance / 40))
+        print "wii distance: ", wii_distance, "mm"
+        dot_size = int(100000 / wii_distance)
+        self.change_dot_size(dot_size)
 
     def plotVals(self, vals):
         self.spi.clear()
@@ -288,13 +286,12 @@ class IrPlotNode(Node):
                                       pen=pg.mkPen(None),
                                       brush=pg.mkBrush(255, 255, 255, 255))
 
-        self.plot.setXRange(0, 1500)
-        self.plot.setYRange(0, 1500)
+        self.plot.setXRange(0, 1024)
+        self.plot.setYRange(0, 768)
 
     def process(self, irData):
         self._ir_vals = irData
         self.calculate_max_light(self._ir_vals)
-        return {'xOut': 1, 'yOut': 2}
 
 
 fclib.registerNodeType(WiimoteNode, [('Sensor',)])
