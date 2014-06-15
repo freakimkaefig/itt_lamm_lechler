@@ -44,11 +44,8 @@ class BufferNode(CtrlNode):
 
     def process(self, **kwds):
         size = int(self.ctrls['size'].value())
-        #print kwds['dataIn']
         self._buffer = np.append(self._buffer, kwds['dataIn'])
         self._buffer = self._buffer[-size:]
-        # output = map(int, self._buffer)
-        #print self._buffer
         output = self._buffer
         return {'dataOut': output}
 
@@ -102,7 +99,6 @@ class WiimoteNode(Node):
         self.connect_button.clicked.connect(self.connect_wiimote)
         # pass wiimotes bluetooth mac adress as param...
         if len(sys.argv) == 2:
-            # print("args.: ", sys.argv[1])
             self.btaddr = sys.argv[1]
         else:
             # ...or hard-code it here
@@ -122,7 +118,6 @@ class WiimoteNode(Node):
         self._ir_vals = self.wiimote.ir
         # Buttons
         self._buttons = self.wiimote.buttons
-        #self.wiimote.buttons.register_callback(self.buttons)
         # todo: other sensors...
 
         self.update()
@@ -200,11 +195,12 @@ class IrPlotNode(Node):
         self.spi = None
         self.avg_vals = []
         self.THETA_FOV = 0.04020182291
-        self.DISTANCE = 21
+        self.DISTANCE = 1000
+        # at ~20 cm distance between candles in test setup
 
         Node.__init__(self, name, terminals=terminals)
 
-    #http://wiiphysics.site88.net/physics.html
+    # from: http://wiiphysics.site88.net/physics.html
     def get_distance(self, x1, x2, y1, y2):
         return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
@@ -215,11 +211,11 @@ class IrPlotNode(Node):
 
     def get_wiimote_distance(self, x1, x2, y1, y2):
         num = self.DISTANCE
-        den = (2 * math.tan(self.get_alpha_angle(x1, x2, y1, y2)))
-        return num / den
+        tmp = math.radians(self.get_alpha_angle(x1, x2, y1, y2))
+        den = (2 * math.tan(tmp))
+        return math.fabs(num / den)
 
     def calculate_max_light(self, ir):
-        #print ir
         self.avg_vals = []
         self._xy_vals = []
         adj_ir = []
@@ -236,7 +232,6 @@ class IrPlotNode(Node):
                                        zip(*x))))
 
         # calculate second max light
-        #print adj_ir
         if adj_ir:
             self._xy_vals = []
             secondMaxLight = max(adj_ir, key=lambda x: x['size'])
@@ -254,7 +249,6 @@ class IrPlotNode(Node):
         self.plotVals(self.avg_vals)
 
     def change_dot_size(self, size):
-        #print "change size"
         if size > 0:
             self.spi.setSize(size)
 
@@ -264,7 +258,6 @@ class IrPlotNode(Node):
         y1 = 0
         x2 = 0
         y2 = 0
-        #print "calculating distance with: ",vals, len(vals)
         for i in vals:
             if(counter == 0):
                 x1 = i[0]
@@ -274,10 +267,10 @@ class IrPlotNode(Node):
                 x2 = i[0]
                 y2 = i[1]
                 counter += 1
-        #print "x1: ",  x1, " y1: ", y1, " x2: ", x2, " y2: ", y2
         wii_distance = self.get_wiimote_distance(x1, x2, y1, y2)
         print "wii distance: ", wii_distance
-        self.change_dot_size(int(wii_distance / 10))
+        print "dot size: ", int(wii_distance / 40)
+        self.change_dot_size(int(wii_distance / 40))
 
     def plotVals(self, vals):
         self.spi.clear()
@@ -317,7 +310,6 @@ if __name__ == '__main__':
     layout = QtGui.QGridLayout()
     cw.setLayout(layout)
 
-    ## Create an empty flowchart with a single input and output
     fc = Flowchart(terminals={
         'dataIn': {'io': 'in'},
         'dataOut': {'io': 'out'}
