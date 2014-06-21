@@ -13,13 +13,12 @@ from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import numpy as np
 import random
-
 import wiimote
 
 
 ## initial values
 bufferSize = 100
-convolutionSize = 10
+convolutionSize = 6
 
 
 ###############################################################################
@@ -64,7 +63,7 @@ class WiimoteNode(Node):
         self.layout.addWidget(self.connect_button)
         self.ui.setLayout(self.layout)
         self.connect_button.clicked.connect(self.connect_wiimote)
-        self.btaddr = "18:2a:7b:f3:f1:68"  # for ease of use
+        self.btaddr = "B8:AE:6E:1B:A3:9B"  # for ease of use
         self.text.setText(self.btaddr)
         self.update_timer = QtCore.QTimer()
         self.update_timer.timeout.connect(self.update_all_sensors)
@@ -172,11 +171,11 @@ class ConvolutionNode(CtrlNode):
         self.size = convolutionSize
         self.kernel = None
 
-        CtrlNode.__init__(self, name, terminals=terminals)        
+        CtrlNode.__init__(self, name, terminals=terminals)
 
     def process(self, **kwds):
         self.bufferSize = len(kwds['dataIn'])
-        
+
         self.size = int(self.ctrls['size'].value())
         self.kernel = [0 for i in range(0, self.bufferSize)]
         start = (self.bufferSize / 2) - (self.size / 2)
@@ -231,11 +230,16 @@ class PlotNode(Node):
             'rawIn': dict(io='in'),
             'filterIn': dict(io='in'),
         }
-
+        self.once = 0  # control var (deletable)
+        self.bufferSize = 10  # fft buffer size
         self.plotWidget = None
         self.curveRaw = None
         self.curveFilter = None
-
+        self.xFftBuffer = np.array([])
+        self.lastMeanYFft = []
+        self.yFftBuffer = np.array([])
+        self.zFftBuffer = np.array([])
+        self.currentName = name
         Node.__init__(self, name, terminals)
 
     def setPlot(self, plotWidget):
@@ -253,6 +257,86 @@ class PlotNode(Node):
         self.curveFilter.setData(kwds['filterIn'])
 
 fclib.registerNodeType(PlotNode, [('Display',)])
+
+
+###############################################################################
+class ActivityNode(Node):
+    nodeName = 'Activity'
+
+    def __init__(self, name):
+        terminals = {
+            'xRawIn': dict(io='in'),
+            'xFilterIn': dict(io='in'),
+            'yRawIn': dict(io='in'),
+            'yFilterIn': dict(io='in'),
+            'zRawIn': dict(io='in'),
+            'zFilterIn': dict(io='in'),
+        }
+        self.once = 0  # control var (deletable)
+        self.bufferSize = 100  # fft buffer size
+        self.xFftBuffer = np.array([])
+        self.yFftBuffer = np.array([])
+        self.zFftBuffer = np.array([])
+        self.lastMeanXFft = []
+        self.lastMeanYFft = []
+        self.lastMeanZFft = []
+        self.currentName = name
+        Node.__init__(self, name, terminals)
+
+    def process(self, **kwds):
+        self.xFftBuffer = np.append(self.xFftBuffer, kwds['xFilterIn'])
+        self.xFftBuffer = self.xFftBuffer[-self.bufferSize:]
+        self.yFftBuffer = np.append(self.yFftBuffer, kwds['yFilterIn'])
+        self.yFftBuffer = self.yFftBuffer[-self.bufferSize:]
+        self.zFftBuffer = np.append(self.zFftBuffer, kwds['zFilterIn'])
+        self.zFftBuffer = self.zFftBuffer[-self.bufferSize:]
+
+        self.lastMeanYFft.append(np.mean(self.yFftBuffer))
+        self.lastMeanYFft = self.lastMeanYFft[-self.bufferSize:]
+        self.lastMeanXFft.append(np.mean(self.xFftBuffer))
+        self.lastMeanXFft = self.lastMeanXFft[-self.bufferSize:]
+        self.lastMeanZFft.append(np.mean(self.zFftBuffer))
+        self.lastMeanZFft = self.lastMeanZFft[-self.bufferSize:]
+        
+        """        
+        sitzn y~13,1          #x~12,7          #z~10,0
+            0 - 14,0       #12,0 - 13,5      #9,0 - 11
+            
+        stehn y~15,0         #x~12,7          z~12,9
+            14,0 - 15,5    #12,4 - 13,0     12,6 - 13,5
+            
+        gehen y~15,1         #x~12,9            z~12,2
+            14,0 - 15,5     #12,6 - 13,2    11,0 - 12,6
+            
+        rennen y~15,8        x~13,4          #z~12,4
+            15,5 - 17     13,1 - 13,7     #12,1 - 12,7
+        
+        according to: """
+        #print "meanFftValues: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
+        
+        # results in:
+        # sitting:
+        if(0.0 <= np.mean(self.lastMeanYFft) and np.mean(self.lastMeanYFft) <= 14.0):
+            #if(12.4 <= np.mean(self.lastMeanXFft) <= 13.0):
+                #if(9.7 <= np.mean(self.lastMeanZFft) <= 10.3):
+                    print "sitting: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
+        # standing:
+        if(14.0 <= np.mean(self.lastMeanYFft) and np.mean(self.lastMeanYFft) <= 15.5 and 12.6 <= np.mean(self.lastMeanZFft) and np.mean(self.lastMeanZFft) <= 13.5):
+            #if(12.4 <= np.mean(self.lastMeanXFft) <= 13.3):
+                #if(12.6 <= np.mean(self.lastMeanZFft) <= 13.5):
+                    print "standing: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
+        # walking:
+        if(14.0 <= np.mean(self.lastMeanYFft) and np.mean(self.lastMeanYFft) <= 15.5 and 11.0 <= np.mean(self.lastMeanZFft) and np.mean(self.lastMeanZFft) <= 12.6):
+            #if(13.4 <= np.mean(self.lastMeanXFft) <= 13.8):
+                #if(11.0 <= np.mean(self.lastMeanZFft) <= 12.6):
+                    print "walking: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
+        # running:
+        if(15.5 <= np.mean(self.lastMeanYFft) and np.mean(self.lastMeanYFft) <= 17.0):
+            #if(13.2 <= np.mean(self.lastMeanXFft) <= 14.5):
+                #if(12.6 <= np.mean(self.lastMeanZFft) <= 13.0):
+                    print "running: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
+
+fclib.registerNodeType(ActivityNode, [('Display',)])
 
 
 ###############################################################################
@@ -295,7 +379,7 @@ if __name__ == '__main__':
     # plotting fft data of X
     xPlotWidget2 = pg.PlotWidget()
     layout.addWidget(xPlotWidget2, 0, 2)
-    xPlotWidget2.setYRange(0, 250)
+    xPlotWidget2.setYRange(0, 150)
     xPlotNode2 = fc.createNode('PlotNode', pos=(900, -450))
     xPlotNode2.setPlot(xPlotWidget2)
     # connecting nodes
@@ -305,8 +389,8 @@ if __name__ == '__main__':
     fc.connectTerminals(xConvNode['convolution'], xPlotNode1['filterIn'])
     fc.connectTerminals(xBufferNode['dataOut'], xRawFftNode['dataIn'])
     fc.connectTerminals(xConvNode['convolution'], xConvFftNode['dataIn'])
-    fc.connectTerminals(xPlotNode2['rawIn'], xRawFftNode['dataOut'])
-    fc.connectTerminals(xPlotNode2['filterIn'], xConvFftNode['dataOut'])
+    fc.connectTerminals(xRawFftNode['dataOut'], xPlotNode2['rawIn'])
+    fc.connectTerminals(xConvFftNode['dataOut'], xPlotNode2['filterIn'])
 
     ### Y ###
     # buffer for Y
@@ -325,7 +409,7 @@ if __name__ == '__main__':
     # plotting fft data of Y
     yPlotWidget2 = pg.PlotWidget()
     layout.addWidget(yPlotWidget2, 1, 2)
-    yPlotWidget2.setYRange(0, 250)
+    yPlotWidget2.setYRange(0, 150)
     yPlotNode2 = fc.createNode('PlotNode', pos=(900, -300))
     yPlotNode2.setPlot(yPlotWidget2)
     # connecting nodes
@@ -335,8 +419,8 @@ if __name__ == '__main__':
     fc.connectTerminals(yConvNode['convolution'], yPlotNode1['filterIn'])
     fc.connectTerminals(yBufferNode['dataOut'], yRawFftNode['dataIn'])
     fc.connectTerminals(yConvNode['convolution'], yConvFftNode['dataIn'])
-    fc.connectTerminals(yPlotNode2['rawIn'], yRawFftNode['dataOut'])
-    fc.connectTerminals(yPlotNode2['filterIn'], yConvFftNode['dataOut'])
+    fc.connectTerminals(yRawFftNode['dataOut'], yPlotNode2['rawIn'])
+    fc.connectTerminals(yConvFftNode['dataOut'], yPlotNode2['filterIn'])
 
     ### Z ###
     # buffer for Z
@@ -352,11 +436,11 @@ if __name__ == '__main__':
     # fft for Z
     zRawFftNode = fc.createNode('Fft', pos=(600, -150))
     zConvFftNode = fc.createNode('Fft', pos=(750, -150))
-    # plotting fft data of Y
+    # plotting fft data of Z
     zPlotWidget2 = pg.PlotWidget()
     layout.addWidget(zPlotWidget2, 2, 2)
-    zPlotWidget2.setYRange(0, 250)
-    zPlotNode2 = fc.createNode('PlotNode', pos=(900, -300))
+    zPlotWidget2.setYRange(0, 150)
+    zPlotNode2 = fc.createNode('PlotNode', pos=(900, -150))
     zPlotNode2.setPlot(zPlotWidget2)
     # connecting nodes
     fc.connectTerminals(wiimoteNode['accelZ'], zBufferNode['dataIn'])
@@ -365,9 +449,23 @@ if __name__ == '__main__':
     fc.connectTerminals(zConvNode['convolution'], zPlotNode1['filterIn'])
     fc.connectTerminals(zBufferNode['dataOut'], zRawFftNode['dataIn'])
     fc.connectTerminals(zConvNode['convolution'], zConvFftNode['dataIn'])
-    fc.connectTerminals(zPlotNode2['rawIn'], zRawFftNode['dataOut'])
-    fc.connectTerminals(zPlotNode2['filterIn'], zConvFftNode['dataOut'])
+    fc.connectTerminals(zRawFftNode['dataOut'], zPlotNode2['rawIn'])
+    fc.connectTerminals(zConvFftNode['dataOut'], zPlotNode2['filterIn'])
+
+    ### ACTIVITY ###
+    # creating activity tracker
+    activity = fc.createNode('Activity', pos=(750, 0))
+    # connecting nodes
+    fc.connectTerminals(xRawFftNode['dataOut'], activity['xRawIn'])
+    fc.connectTerminals(yRawFftNode['dataOut'], activity['yRawIn'])
+    fc.connectTerminals(zRawFftNode['dataOut'], activity['zRawIn'])
+    fc.connectTerminals(xConvFftNode['dataOut'], activity['xFilterIn'])
+    fc.connectTerminals(yConvFftNode['dataOut'], activity['yFilterIn'])
+    fc.connectTerminals(zConvFftNode['dataOut'], activity['zFilterIn'])
 
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
+
+
+
