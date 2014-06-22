@@ -3,7 +3,27 @@
 # -*- coding: utf-8 -*-
 
 """
-describe operation of activity recognition system HERE
+The sensor data of all three axes is stored in seperate buffers with a
+default length of 100. To demonstrate the difference, the raw values are
+plotted besides these values combined with a square convolution filter to
+reduce noise. The filtered values are used for a fast fourier transform to
+detect frequencies of movements.
+The last node “Activity” receives the filtered data (convolution + fft) from
+each axes. After collecting a reasonable amount of data from each axis,
+the recognition of the activites ‘sitting’, ‘standing’, ‘walking’ and
+‘running’ is mostly determined by the changes within the values of the
+Y-axis.
+By calculating the mean of the last 100 values of each axes the activity
+recognition is more stable and less fragile towards variations within
+those values. Once a activity is recognised it is temporarily saved.
+By counting the occurence of the last 100 recognised activities we ultimately
+determine the displayed activity.
+By doing so we lowered our sights regarding the speed of activity recognition
+but we are able to tell the currentliy performed activity fairly accurate.
+However the reviewed values are heavily depending on the rotation of the
+wiimote inside ones trouser pocket. The most accurate results were received
+when the  front of the wiimote (IR sensor) was pointing towards the ground
+while the buttons (e.g. ‘+’ or ‘A’) where facing ones leg.
 """
 
 from pyqtgraph.flowchart import Flowchart, Node
@@ -16,7 +36,7 @@ import random
 import wiimote
 
 
-## initial values
+# initial values
 bufferSize = 100
 convolutionSize = 6
 
@@ -26,7 +46,7 @@ class WiimoteNode(Node):
     """
     Outputs sensor data from a Wiimote.
 
-    Supported sensors: accelerometer (3 axis)
+    Supported sensors: accelerometer (3 axes)
     Text input box allows for setting a Bluetooth MAC address.
     Pressing the "connect" button tries connecting to the Wiimote.
     Update rate can be changed via a spinbox widget. Setting it to "0"
@@ -63,7 +83,10 @@ class WiimoteNode(Node):
         self.layout.addWidget(self.connect_button)
         self.ui.setLayout(self.layout)
         self.connect_button.clicked.connect(self.connect_wiimote)
-        self.btaddr = "B8:AE:6E:1B:A3:9B"  # for ease of use
+        if len(sys.argv) == 2:
+            self.btaddr = sys.argv[1]
+        else:
+            self.btaddr = "B8:AE:6E:1B:A3:9B"
         self.text.setText(self.btaddr)
         self.update_timer = QtCore.QTimer()
         self.update_timer.timeout.connect(self.update_all_sensors)
@@ -139,11 +162,7 @@ class BufferNode(CtrlNode):
 
         CtrlNode.__init__(self, name, terminals=terminals)
 
-    def bufferChange(self, event):
-        print "Hello"
-
     def process(self, **kwds):
-        #self.ctrls['size'].valueChanged.connect(self.bufferChange)
         size = int(self.ctrls['size'].value())
         buffersize = size
         self._buffer = np.append(self._buffer, kwds['dataIn'])
@@ -156,9 +175,15 @@ fclib.registerNodeType(BufferNode, [('Data',)])
 
 ###############################################################################
 class ConvolutionNode(CtrlNode):
+    """
+    Filters data with square convolution.
+    A spinbox widget allows for setting the size of the square.
+    """
     nodeName = "Convolution"
     uiTemplate = [
-        ('size',  'spin', {'value': convolutionSize, 'step': 2, 'range': [0, 20]}),
+        ('size',  'spin', {'value': convolutionSize,
+                           'step': 2,
+                           'range': [0, 20]}),
     ]
 
     def __init__(self, name):
@@ -193,7 +218,9 @@ fclib.registerNodeType(ConvolutionNode, [('Display',)])
 ###############################################################################
 class FftNode(Node):
     nodeName = "Fft"
-
+    """
+    Converts time of sensor inputs to frequency with a fast fourier transform.
+    """
     def __init__(self, name):
         terminals = {
             'dataIn': dict(io='in'),
@@ -216,13 +243,17 @@ class FftNode(Node):
         Y = np.fft.fft(data)/n
         Y = Y[range(n/2)]
         return {'dataOut': abs(Y)}
-        #self.curveRaw.setData(frq, abs(Y))
 
 fclib.registerNodeType(FftNode, [('Data',)])
 
 
 ###############################################################################
 class PlotNode(Node):
+    """
+    Node that hosts a PyQt PlotWidget and in this case,
+    two curves for the raw data and the filtered data.
+    The raw data is displayed yellow, the filtered is red.
+    """
     nodeName = 'PlotNode'
 
     def __init__(self, name):
@@ -235,11 +266,6 @@ class PlotNode(Node):
         self.plotWidget = None
         self.curveRaw = None
         self.curveFilter = None
-        self.xFftBuffer = np.array([])
-        self.lastMeanYFft = []
-        self.yFftBuffer = np.array([])
-        self.zFftBuffer = np.array([])
-        self.currentName = name
         Node.__init__(self, name, terminals)
 
     def setPlot(self, plotWidget):
@@ -261,15 +287,16 @@ fclib.registerNodeType(PlotNode, [('Display',)])
 
 ###############################################################################
 class ActivityNode(Node):
+    """
+    Receives filtered sensor data and data from fft to calculate
+    the current activity.
+    """
     nodeName = 'Activity'
 
     def __init__(self, name):
         terminals = {
-            'xRawIn': dict(io='in'),
             'xFilterIn': dict(io='in'),
-            'yRawIn': dict(io='in'),
             'yFilterIn': dict(io='in'),
-            'zRawIn': dict(io='in'),
             'zFilterIn': dict(io='in'),
         }
         self.once = 0  # control var (deletable)
@@ -280,8 +307,14 @@ class ActivityNode(Node):
         self.lastMeanXFft = []
         self.lastMeanYFft = []
         self.lastMeanZFft = []
-        self.currentName = name
+        self.measuredActivities = []
+        self.countedActivities = []
+        self.label = None
         Node.__init__(self, name, terminals)
+
+    def setLabel(self, label):
+        self.label = label
+        self.label.setStyleSheet("font: 24pt; color:#33a;")
 
     def process(self, **kwds):
         self.xFftBuffer = np.append(self.xFftBuffer, kwds['xFilterIn'])
@@ -297,44 +330,52 @@ class ActivityNode(Node):
         self.lastMeanXFft = self.lastMeanXFft[-self.bufferSize:]
         self.lastMeanZFft.append(np.mean(self.zFftBuffer))
         self.lastMeanZFft = self.lastMeanZFft[-self.bufferSize:]
-        
-        """        
-        sitzn y~13,1          #x~12,7          #z~10,0
-            0 - 14,0       #12,0 - 13,5      #9,0 - 11
-            
-        stehn y~15,0         #x~12,7          z~12,9
-            14,0 - 15,5    #12,4 - 13,0     12,6 - 13,5
-            
-        gehen y~15,1         #x~12,9            z~12,2
-            14,0 - 15,5     #12,6 - 13,2    11,0 - 12,6
-            
-        rennen y~15,8        x~13,4          #z~12,4
-            15,5 - 17     13,1 - 13,7     #12,1 - 12,7
-        
-        according to: """
-        #print "meanFftValues: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
-        
-        # results in:
-        # sitting:
-        if(0.0 <= np.mean(self.lastMeanYFft) and np.mean(self.lastMeanYFft) <= 14.0):
-            #if(12.4 <= np.mean(self.lastMeanXFft) <= 13.0):
-                #if(9.7 <= np.mean(self.lastMeanZFft) <= 10.3):
-                    print "sitting: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
-        # standing:
-        if(14.0 <= np.mean(self.lastMeanYFft) and np.mean(self.lastMeanYFft) <= 15.5 and 12.6 <= np.mean(self.lastMeanZFft) and np.mean(self.lastMeanZFft) <= 13.5):
-            #if(12.4 <= np.mean(self.lastMeanXFft) <= 13.3):
-                #if(12.6 <= np.mean(self.lastMeanZFft) <= 13.5):
-                    print "standing: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
-        # walking:
-        if(14.0 <= np.mean(self.lastMeanYFft) and np.mean(self.lastMeanYFft) <= 15.5 and 11.0 <= np.mean(self.lastMeanZFft) and np.mean(self.lastMeanZFft) <= 12.6):
-            #if(13.4 <= np.mean(self.lastMeanXFft) <= 13.8):
-                #if(11.0 <= np.mean(self.lastMeanZFft) <= 12.6):
-                    print "walking: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
-        # running:
-        if(15.5 <= np.mean(self.lastMeanYFft) and np.mean(self.lastMeanYFft) <= 17.0):
-            #if(13.2 <= np.mean(self.lastMeanXFft) <= 14.5):
-                #if(12.6 <= np.mean(self.lastMeanZFft) <= 13.0):
-                    print "running: ", np.mean(self.lastMeanYFft), ", x: ",np.mean(self.lastMeanXFft), ", z: ",np.mean(self.lastMeanZFft)
+
+        if(len(self.lastMeanYFft) < 100):
+            self.label.setText("Collecting data...")
+        else:
+            mA = self.measuredActivities
+
+            # check if sitting:
+            if(0.0 <= np.mean(self.lastMeanYFft)
+               and np.mean(self.lastMeanYFft) <= 14.0):
+                        mA.append('sitting')
+
+            # check if standing:
+            if(14.0 <= np.mean(self.lastMeanYFft)
+               and np.mean(self.lastMeanYFft) <= 15.5
+               and 12.4 <= np.mean(self.lastMeanZFft)
+               and np.mean(self.lastMeanZFft) <= 13.5):
+                        mA.append('standing')
+
+            # check if walking:
+            if(14.0 <= np.mean(self.lastMeanYFft)
+               and np.mean(self.lastMeanYFft) <= 15.5
+               and 11.0 <= np.mean(self.lastMeanZFft)
+               and np.mean(self.lastMeanZFft) <= 12.4):
+                        mA.append('walking')
+
+            # check if running:
+            if(15.5 <= np.mean(self.lastMeanYFft)
+               and np.mean(self.lastMeanYFft) <= 17.0):
+                        mA.append('running')
+
+            # collect more data to recognise activities more reliable
+            # therefore alternating activities aren't recognised right away
+            if(len(mA) > 99):
+                # cut off old data
+                mA = mA[-self.bufferSize:]
+
+                # create dict with key:value pairs,
+                # where value is the occurence of a key
+                activityDict = dict((i, mA.count(i)) for i in mA)
+
+                # split keys and values into seperate lists
+                activityValues = list(activityDict.values())
+                activityKeys = list(activityDict.keys())
+
+                text = activityKeys[activityValues.index(max(activityValues))]
+                self.label.setText(text)
 
 fclib.registerNodeType(ActivityNode, [('Display',)])
 
@@ -344,13 +385,13 @@ if __name__ == '__main__':
     import sys
     app = QtGui.QApplication([])
     win = QtGui.QMainWindow()
-    win.setWindowTitle('WiimoteNode demo')
+    win.setWindowTitle('Activity tracker')
     cw = QtGui.QWidget()
     win.setCentralWidget(cw)
     layout = QtGui.QGridLayout()
     cw.setLayout(layout)
 
-    ## Create an empty flowchart with a single input and output
+    # Create an empty flowchart with a single input and output
     fc = Flowchart(terminals={
         'dataIn': {'io': 'in'},
         'dataOut': {'io': 'out'}
@@ -362,7 +403,7 @@ if __name__ == '__main__':
     # wiimote node
     wiimoteNode = fc.createNode('Wiimote', pos=(0, -300), )
 
-    ### X ###
+    # X
     # buffer for X
     xBufferNode = fc.createNode('Buffer', pos=(150, -450))
     # convolution filter for X
@@ -374,25 +415,25 @@ if __name__ == '__main__':
     xPlotNode1 = fc.createNode('PlotNode', pos=(450, -450))
     xPlotNode1.setPlot(xPlotWidget1)
     # fft for X
-    xRawFftNode = fc.createNode('Fft', pos=(600, -450))
-    xConvFftNode = fc.createNode('Fft', pos=(750, -450))
+    xConvFftNode = fc.createNode('Fft', pos=(600, -450))
     # plotting fft data of X
-    xPlotWidget2 = pg.PlotWidget()
-    layout.addWidget(xPlotWidget2, 0, 2)
-    xPlotWidget2.setYRange(0, 150)
-    xPlotNode2 = fc.createNode('PlotNode', pos=(900, -450))
-    xPlotNode2.setPlot(xPlotWidget2)
+    xFftPlotWidget = pg.PlotWidget()
+    layout.addWidget(xFftPlotWidget, 0, 2)
+    xFftPlotWidget.setYRange(0, 150)
+    xFftPlotNode = fc.createNode('PlotWidget', pos=(750, -450))
+    xFftPlotNode.setPlot(xFftPlotWidget)
+    xFftPlotLegend = pg.LegendItem(offset=(-1, 1))
+    xFftPlotLegend.addItem(xFftPlotWidget.getPlotItem().plot(), 'Fft X')
+    xFftPlotLegend.setParentItem(xFftPlotWidget.getPlotItem())
     # connecting nodes
     fc.connectTerminals(wiimoteNode['accelX'], xBufferNode['dataIn'])
     fc.connectTerminals(xBufferNode['dataOut'], xConvNode['dataIn'])
     fc.connectTerminals(xBufferNode['dataOut'], xPlotNode1['rawIn'])
     fc.connectTerminals(xConvNode['convolution'], xPlotNode1['filterIn'])
-    fc.connectTerminals(xBufferNode['dataOut'], xRawFftNode['dataIn'])
     fc.connectTerminals(xConvNode['convolution'], xConvFftNode['dataIn'])
-    fc.connectTerminals(xRawFftNode['dataOut'], xPlotNode2['rawIn'])
-    fc.connectTerminals(xConvFftNode['dataOut'], xPlotNode2['filterIn'])
+    fc.connectTerminals(xConvFftNode['dataOut'], xFftPlotNode['In'])
 
-    ### Y ###
+    # Y
     # buffer for Y
     yBufferNode = fc.createNode('Buffer', pos=(150, -300))
     # convolution filter for Y
@@ -404,25 +445,25 @@ if __name__ == '__main__':
     yPlotNode1 = fc.createNode('PlotNode', pos=(450, -300))
     yPlotNode1.setPlot(yPlotWidget1)
     # fft for Y
-    yRawFftNode = fc.createNode('Fft', pos=(600, -300))
-    yConvFftNode = fc.createNode('Fft', pos=(750, -300))
+    yConvFftNode = fc.createNode('Fft', pos=(600, -300))
     # plotting fft data of Y
-    yPlotWidget2 = pg.PlotWidget()
-    layout.addWidget(yPlotWidget2, 1, 2)
-    yPlotWidget2.setYRange(0, 150)
-    yPlotNode2 = fc.createNode('PlotNode', pos=(900, -300))
-    yPlotNode2.setPlot(yPlotWidget2)
+    yFftPlotWidget = pg.PlotWidget()
+    layout.addWidget(yFftPlotWidget, 1, 2)
+    yFftPlotWidget.setYRange(0, 150)
+    yFftPlotNode = fc.createNode('PlotWidget', pos=(750, -300))
+    yFftPlotNode.setPlot(yFftPlotWidget)
+    yFftPlotLegend = pg.LegendItem(offset=(-1, 1))
+    yFftPlotLegend.addItem(yFftPlotWidget.getPlotItem().plot(), 'Fft Y')
+    yFftPlotLegend.setParentItem(yFftPlotWidget.getPlotItem())
     # connecting nodes
     fc.connectTerminals(wiimoteNode['accelY'], yBufferNode['dataIn'])
     fc.connectTerminals(yBufferNode['dataOut'], yConvNode['dataIn'])
     fc.connectTerminals(yBufferNode['dataOut'], yPlotNode1['rawIn'])
     fc.connectTerminals(yConvNode['convolution'], yPlotNode1['filterIn'])
-    fc.connectTerminals(yBufferNode['dataOut'], yRawFftNode['dataIn'])
     fc.connectTerminals(yConvNode['convolution'], yConvFftNode['dataIn'])
-    fc.connectTerminals(yRawFftNode['dataOut'], yPlotNode2['rawIn'])
-    fc.connectTerminals(yConvFftNode['dataOut'], yPlotNode2['filterIn'])
+    fc.connectTerminals(yConvFftNode['dataOut'], yFftPlotNode['In'])
 
-    ### Z ###
+    # Z
     # buffer for Z
     zBufferNode = fc.createNode('Buffer', pos=(150, -150))
     # convolution filter for Z
@@ -434,31 +475,31 @@ if __name__ == '__main__':
     zPlotNode1 = fc.createNode('PlotNode', pos=(450, -150))
     zPlotNode1.setPlot(zPlotWidget1)
     # fft for Z
-    zRawFftNode = fc.createNode('Fft', pos=(600, -150))
-    zConvFftNode = fc.createNode('Fft', pos=(750, -150))
+    zConvFftNode = fc.createNode('Fft', pos=(600, -150))
     # plotting fft data of Z
-    zPlotWidget2 = pg.PlotWidget()
-    layout.addWidget(zPlotWidget2, 2, 2)
-    zPlotWidget2.setYRange(0, 150)
-    zPlotNode2 = fc.createNode('PlotNode', pos=(900, -150))
-    zPlotNode2.setPlot(zPlotWidget2)
+    zFftPlotWidget = pg.PlotWidget()
+    layout.addWidget(zFftPlotWidget, 2, 2)
+    zFftPlotWidget.setYRange(0, 150)
+    zFftPlotNode = fc.createNode('PlotWidget', pos=(750, -150))
+    zFftPlotNode.setPlot(zFftPlotWidget)
+    zFftPlotLegend = pg.LegendItem(offset=(-1, 1))
+    zFftPlotLegend.addItem(zFftPlotWidget.getPlotItem().plot(), 'Fft Z')
+    zFftPlotLegend.setParentItem(zFftPlotWidget.getPlotItem())
     # connecting nodes
     fc.connectTerminals(wiimoteNode['accelZ'], zBufferNode['dataIn'])
     fc.connectTerminals(zBufferNode['dataOut'], zConvNode['dataIn'])
     fc.connectTerminals(zBufferNode['dataOut'], zPlotNode1['rawIn'])
     fc.connectTerminals(zConvNode['convolution'], zPlotNode1['filterIn'])
-    fc.connectTerminals(zBufferNode['dataOut'], zRawFftNode['dataIn'])
     fc.connectTerminals(zConvNode['convolution'], zConvFftNode['dataIn'])
-    fc.connectTerminals(zRawFftNode['dataOut'], zPlotNode2['rawIn'])
-    fc.connectTerminals(zConvFftNode['dataOut'], zPlotNode2['filterIn'])
+    fc.connectTerminals(zConvFftNode['dataOut'], zFftPlotNode['In'])
 
-    ### ACTIVITY ###
+    # ACTIVITY
     # creating activity tracker
     activity = fc.createNode('Activity', pos=(750, 0))
+    activityLabel = QtGui.QLabel("please connect WiiMote")
+    layout.addWidget(activityLabel, 2, 0)
+    activity.setLabel(activityLabel)
     # connecting nodes
-    fc.connectTerminals(xRawFftNode['dataOut'], activity['xRawIn'])
-    fc.connectTerminals(yRawFftNode['dataOut'], activity['yRawIn'])
-    fc.connectTerminals(zRawFftNode['dataOut'], activity['zRawIn'])
     fc.connectTerminals(xConvFftNode['dataOut'], activity['xFilterIn'])
     fc.connectTerminals(yConvFftNode['dataOut'], activity['yFilterIn'])
     fc.connectTerminals(zConvFftNode['dataOut'], activity['zFilterIn'])
@@ -466,6 +507,3 @@ if __name__ == '__main__':
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
-
-
-
