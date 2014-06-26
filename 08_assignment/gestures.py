@@ -44,7 +44,7 @@ class BufferNode(CtrlNode):
 
     def decrease_buffer_size(self):
         size = self.ctrls['size'].value()
-        self.ctrls['size'].setValue(size - 1.0)    
+        self.ctrls['size'].setValue(size - 1.0)
 
     def process(self, **kwds):
         size = int(self.ctrls['size'].value())
@@ -53,15 +53,15 @@ class BufferNode(CtrlNode):
         self.buttons = kwds['buttons']
 
         # check buttons to increase or decrease buffer size
-        if self.buttons['Plus'] == True:
+        if self.buttons['Plus'] is True:
             self.plusPressed = True
-        if self.buttons['Plus'] == False:
+        if self.buttons['Plus'] is False:
             if self.plusPressed:
                 self.plusPressed = False
                 self.increase_buffer_size()
-        if self.buttons['Minus'] == True:
+        if self.buttons['Minus'] is True:
             self.minusPressed = True
-        if self.buttons['Minus'] == False:
+        if self.buttons['Minus'] is False:
             if self.minusPressed:
                 self.minusPressed = False
                 self.decrease_buffer_size()
@@ -141,7 +141,7 @@ class WiimoteNode(Node):
         self._ir_vals = self.wiimote.ir
         # Buttons
         self._buttons = self.wiimote.buttons
-        #self.wiimote.buttons.register_callback(self.buttons)
+        # self.wiimote.buttons.register_callback(self.buttons)
         # todo: other sensors...
 
         self.update()
@@ -188,15 +188,16 @@ class WiimoteNode(Node):
         ir = self._ir_vals
         return {'accelX': np.array([x]), 'accelY': np.array([y]),
                 'accelZ': np.array([z]), 'ir': np.array([ir]),
-                'buttons': self._buttons }
+                'buttons': self._buttons}
 
 fclib.registerNodeType(WiimoteNode, [('Sensor',)])
 
 
 class IrLightNode(Node):
     """
-    Buffers positions of the most intense light source
-    returned by the wiimote ir camera
+    Calculates the most intense light source of ir camera values given.
+    Returns the average x-, and y-position of the 'pointer' (most
+    intense light source)
     """
 
     nodeName = "IrLightNode"
@@ -213,35 +214,34 @@ class IrLightNode(Node):
         Node.__init__(self, name, terminals=terminals)
 
     def calculate_max_light(self, ir):
-        #print self.wiimote.buttons[0]
-        self._xy_vals = []
-        maxLight = max(ir, key=lambda x: x['size'])
-        for val in ir:
-            if int(maxLight['id']) == int(val['id']):
-                self._xy_vals.append((val['x'], val['y']))
+        if ir.any():
+            self._xy_vals = []
+            maxLight = max(ir, key=lambda x: x['size'])
+            for val in ir:
+                if int(maxLight['id']) == int(val['id']):
+                    self._xy_vals.append((val['x'], val['y']))
 
-        x = self._xy_vals
-        self.avg_val = tuple(map(lambda y: sum(y) / float(len(y)),
-                                 zip(*x)))
-
+            x = self._xy_vals
+            self.avg_val = tuple(map(lambda y: sum(y) / float(len(y)),
+                                     zip(*x)))
 
     def process(self, **kwds):
         self.calculate_max_light(kwds['In'])
-        return { 'Out': self.avg_val }
+        return {'Out': self.avg_val}
 
 fclib.registerNodeType(IrLightNode, [('Data',)])
 
 
 class GesturePlotNode(Node):
     """
-    Plots ir sensor data data from a Wiimote
+    Plots the current position of the 'pointer' (IR light source)
+    Also plots the path of gesture during recording (visual feedback)
     """
     nodeName = "GesturePlotNode"
 
     def __init__(self, name):
         terminals = {
             'positionIn': dict(io='in'),
-            'buttons': dict(io='in'),
             'pathIn': dict(io='in'),
         }
         self._ir_vals = []
@@ -252,34 +252,30 @@ class GesturePlotNode(Node):
         self.avg_val = (0, 0)
 
         Node.__init__(self, name, terminals=terminals)
-    
+
     def plotPosition(self, val):
-        #print val
-        self.spiPos.clear()
-        points = [{'pos': [1024 - val[0], 768 - val[1]], 'data': 1}]
-        self.spiPos.addPoints(points)
-        self.plot.addItem(self.spiPos)
+        # plotting current position of the "pointer" (ir light source)
+        if val is not None:
+            self.spiPos.clear()
+            points = [{'pos': [1024 - val[0], 768 - val[1]], 'data': 1}]
+            self.spiPos.addPoints(points)
+            self.plot.addItem(self.spiPos)
 
     def plotPath(self, vals):
-        # uncomment to reset:
-        #self.spi2.clear()
-        points = []
-        counter = 1
-        for point in vals:
-            #print point
-            points.append({'pos': [1024 - point[0], 768 - point[1]], 'data': counter})
-            counter += 1
-        self.spiPath.addPoints(points)
-        self.plot.addItem(self.spiPath)
+        # plotting path while recording (visual feedback)
+        if vals is not None:
+            points = []
+            counter = 1
+            for point in vals:
+                points.append({'pos': [1024 - point[0], 768 - point[1]], 'data': counter})
+                counter += 1
+            self.spiPath.addPoints(points)
+            self.plot.addItem(self.spiPath)
 
     def setPlot(self, plot):
         self.plot = plot
-        self.spiPos = pg.ScatterPlotItem(size=10,
-                                      pen=pg.mkPen(None),
-                                      brush=pg.mkBrush(255, 255, 255, 255))
-        self.spiPath = pg.ScatterPlotItem(size=10,
-                                      pen=pg.mkPen(None),
-                                      brush=pg.mkBrush(255, 0, 0, 255))
+        self.spiPos = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 255))
+        self.spiPath = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 0, 0, 255), ls='solid', marker='o')
 
         self.plot.setXRange(0, 1024)
         self.plot.setYRange(0, 768)
@@ -293,7 +289,8 @@ fclib.registerNodeType(GesturePlotNode, [('Display',)])
 
 class GestureNode(Node):
     """
-    Handles gesture recognition of values from wiimote ir camera
+    Handles gesture recognition of point data from
+    wiimote ir camera
     """
 
     nodeName = "GestureNode"
@@ -307,44 +304,82 @@ class GestureNode(Node):
         self.path = []
         self.buttons = None
         self.aPressed = False
+        self.recognizedGesture = None
 
         Node.__init__(self, name, terminals=terminals)
 
-    def getDistance(self, x, y):
-        dis1 = x[0] - y[0]
-        dis2 = x[1] - y[1]
-        return sqrt(dis1*dis1 - dis2*dis2)
+    def setLabel(self, label):
+        self.label = label
+        self.label.setStyleSheet("font: 24pt; color:#33a;")
 
-    def resample(self, n):
-        #print "plotting"
-        l = len(self.path)/(n-1)
-        D = 0
-        newPoints = self.path[0]
-        for i in range(1, len(self.path)):
-            d = self.getDistance(p[i-1], p[i])
-    
-    def setwiimote(self, wiimote):
-        self.wiimote = wiimote
-    
-    def savePath(self, value):
-        #while(self.true):
-        #print "saving"
+    def distance(self, x, y):
+        dx = x[0] - y[0]
+        dy = x[1] - y[1]
+        return sqrt(dx*dx - dy*dy)
+
+    def total_length(self, point_list):
+        p1 = point_list[0]
+        length = 0.0
+        for i in range(1, len(point_list)):
+            length += distance(p1, point_list[i])
+            p1 = point_list[i]
+        return length
+
+    def resample(self, point_list, step_count=64):
+        # 1$ recognizer implementation
+        newpoints = []
+        length = total_length(point_list)
+        stepsize = length/step_count
+        curpos = 0
+        newpoints.appen(point_list[0])
+        i = 1
+        while i < len(point_list):
+            p1 = point_list[i-1]
+            d = distance(p1, point_list[i])
+            if curpos + d >= stepsize:
+                nx = p1[0] + ((stepsize - curpos) / d) * (point_list[i][0] - p1[0])
+                ny = p1[1] + ((stepsize - curpos) / d) * (point_list[i][1] - p1[1])
+                newpoints.append([nx, ny])
+                point_list.insert(i, [nx, ny])
+                curpos = 0
+            else:
+                curpos += d
+            i += 1
+        return newpoints
+
+    def saveTemplate(self, path):
+        print "saveTemplate"
+        # save path as template
+
+    def checkRecognizedGesture(self, path):
+        # check for gestures
+        if recognizedGesture is not None:
+            self.label.setText(recognizedGesture)
+        else:
+            self.label.setText("no gesture recognized")
+
+    def recordGesture(self, value):
         self.path.append(value)
-        #time.sleep(0.5)
-        #print self.path
 
     def process(self, **kwds):
         self.buttons = kwds['buttons']
-        if self.buttons['A'] == True:
+        if self.buttons['A'] is True:
             self.aPressed = True
-            #self.plotNode.true = True
-            self.savePath(kwds['In'])
-        if self.buttons['A'] == False:
+            self.recordGesture(kwds['In'])
+        if self.buttons['A'] is False:
             if self.aPressed:
-                #self.plotNode.true = False
-                #self.resample(16)
+                self.resample(self.path)
+                self.path = []
                 self.aPressed = False
-        return { 'Out': self.path }
+
+        """
+        detect at least three different predefined shapes (e.g. circle, square, ...)
+        gesture data is recorded while pressing the 'A' button and analyzed on release
+        possible to learn new shapes/create new templates by using the 'B' button while recording
+        display raw data and templates as graph + a text label indicating the recognized gesture
+        """
+
+        return {'Out': self.path}
 
 fclib.registerNodeType(GestureNode, [('Display',)])
 
@@ -359,7 +394,7 @@ if __name__ == '__main__':
     layout = QtGui.QGridLayout()
     cw.setLayout(layout)
 
-    ## Create an empty flowchart with a single input and output
+    # Create an empty flowchart with a single input and output
     fc = Flowchart(terminals={
         'dataIn': {'io': 'in'},
         'dataOut': {'io': 'out'}
@@ -380,6 +415,11 @@ if __name__ == '__main__':
     # connect ir camera
     plotter = view.addPlot()
     gesturePlotNode.setPlot(plotter)
+
+    # creating label for recognized gesture
+    gestureLabel = QtGui.QLabel("please connect WiiMote")
+    layout.addWidget(gestureLabel, 2, 0)
+    gestureNode.setLabel(gestureLabel)
 
     fc.connectTerminals(wiimoteNode['ir'], bufferNodeIr['dataIn'])
     fc.connectTerminals(wiimoteNode['buttons'], bufferNodeIr['buttons'])
