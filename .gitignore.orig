@@ -52,6 +52,12 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+<<<<<<< HEAD
 
 07_assignment/Kopie von activity.py
 08_assignment/Kopie von gestures.py
+=======
+
+07_assignment/Kopie von activity.py
+_*.py
+>>>>>>> 1f7902328af753717050571c34a556a046fc0ac0
