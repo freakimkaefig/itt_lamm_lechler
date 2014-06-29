@@ -9,7 +9,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import numpy as np
 import time
-import re
+import math
 import wiimote
 
 
@@ -22,7 +22,7 @@ class BufferNode(CtrlNode):
     """
     nodeName = "Buffer"
     uiTemplate = [
-        ('size',  'spin', {'value': 32.0, 'step': 1.0, 'range': [0.0, 128.0]}),
+        ('size',  'spin', {'value': 4.0, 'step': 1.0, 'range': [0.0, 128.0]}),
     ]
 
     def __init__(self, name):
@@ -38,6 +38,17 @@ class BufferNode(CtrlNode):
 
         CtrlNode.__init__(self, name, terminals=terminals)
 
+    def register_buttons(self, buttons):
+        self.buttons = buttons
+        self.buttons.register_callback(self.button_callback)
+
+    def button_callback(self, buttons):
+        if buttons:
+            if buttons[0] == ('Minus', True):
+                self.decrease_buffer_size()
+            if buttons[0] == ('Plus', True):
+                self.increase_buffer_size()
+
     def increase_buffer_size(self):
         size = self.ctrls['size'].value()
         self.ctrls['size'].setValue(size + 1.0)
@@ -50,21 +61,9 @@ class BufferNode(CtrlNode):
         size = int(self.ctrls['size'].value())
         self._buffer = np.append(self._buffer, kwds['dataIn'])
         self._buffer = self._buffer[-size:]
-        self.buttons = kwds['buttons']
 
-        # check buttons to increase or decrease buffer size
-        if self.buttons['Plus'] is True:
-            self.plusPressed = True
-        if self.buttons['Plus'] is False:
-            if self.plusPressed:
-                self.plusPressed = False
-                self.increase_buffer_size()
-        if self.buttons['Minus'] is True:
-            self.minusPressed = True
-        if self.buttons['Minus'] is False:
-            if self.minusPressed:
-                self.minusPressed = False
-                self.decrease_buffer_size()
+        if self.buttons is None:
+            self.register_buttons(kwds['buttons'])
 
         output = self._buffer
         return {'dataOut': output}
@@ -121,7 +120,6 @@ class WiimoteNode(Node):
         self.connect_button.clicked.connect(self.connect_wiimote)
         # pass wiimotes bluetooth mac adress as param...
         if len(sys.argv) == 2:
-            # print("args.: ", sys.argv[1])
             self.btaddr = sys.argv[1]
         else:
             # ...or hard-code it here
@@ -243,12 +241,14 @@ class GesturePlotNode(Node):
         terminals = {
             'positionIn': dict(io='in'),
             'pathIn': dict(io='in'),
+            'templateIn': dict(io='in'),
         }
         self._ir_vals = []
         self._xy_vals = []
         self.plot = None
         self.spiPos = None
         self.spiPath = None
+        self.spiTemplate = None
         self.avg_val = (0, 0)
 
         Node.__init__(self, name, terminals=terminals)
@@ -263,7 +263,9 @@ class GesturePlotNode(Node):
 
     def plotPath(self, vals):
         # plotting path while recording (visual feedback)
-        if vals is not None:
+        if vals == []:
+            self.spiPath.clear()
+        else:
             points = []
             counter = 1
             for point in vals:
@@ -272,17 +274,38 @@ class GesturePlotNode(Node):
             self.spiPath.addPoints(points)
             self.plot.addItem(self.spiPath)
 
+    def plotTemplate(self, vals):
+        # plotting recognized template
+        if vals == []:
+            self.spiTemplate.clear()
+        else:
+            points = []
+            counter = 1
+            for point in vals:
+                points.append({'pos': [1024 - point[0], 768 - point[1]], 'data': counter})
+                counter += 1
+            self.spiTemplate.addPoints(points)
+            self.plot.addItem(self.spiTemplate)
+
     def setPlot(self, plot):
         self.plot = plot
-        self.spiPos = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 255))
-        self.spiPath = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 0, 0, 255), ls='solid', marker='o')
+        self.spiPos = pg.ScatterPlotItem(size=3, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 255))
+        self.spiPath = pg.ScatterPlotItem(size=3, pen=pg.mkPen(None), brush=pg.mkBrush(255, 0, 0, 255))
+        self.spiTemplate = pg.ScatterPlotItem(size=3, pen=pg.mkPen(None), brush=pg.mkBrush(0, 100, 255, 255))
 
         self.plot.setXRange(0, 1024)
         self.plot.setYRange(0, 768)
 
+        self.legend = pg.LegendItem(offset=(-1, 1))
+        self.legend.addItem(self.spiPos, 'position')
+        self.legend.addItem(self.spiPath, 'path')
+        self.legend.addItem(self.spiTemplate, 'template')
+        self.legend.setParentItem(self.plot)
+
     def process(self, **kwds):
         self.plotPosition(kwds['positionIn'])
         self.plotPath(kwds['pathIn'])
+        self.plotTemplate(kwds['templateIn'])
 
 fclib.registerNodeType(GesturePlotNode, [('Display',)])
 
@@ -299,43 +322,196 @@ class GestureNode(Node):
         terminals = {
             'In': dict(io='in'),
             'buttons': dict(io='in'),
-            'Out': dict(io='out'),
+            'pathOut': dict(io='out'),
+            'templateOut': dict(io='out'),
         }
         self.path = []
+        self.recognizedTemplate = []
+
+        self.inputVals = None
         self.buttons = None
         self.aPressed = False
-        self.recognizedGesture = None
+        self.bPressed = False
+        self.once = 0
+
+        self.templates = []
+        self.templateCounter = 0
+        self.SQUARE_SIZE = 250.0
+        self.HALF_DIAGONAL = 0.5 * math.sqrt(250.0 * 250.0 + 250.0 * 250.0)
+        self.ANGLE_RANGE = 45.0
+        self.ANGLE_PRECISION = 2.0
+        self.PHI = 0.5 * (-1.0 + math.sqrt(5.0))  # Golden Ratio
 
         Node.__init__(self, name, terminals=terminals)
+
+    def register_buttons(self, buttons):
+        self.buttons = buttons
+        self.buttons.register_callback(self.button_callback)
+
+    def button_callback(self, buttons):
+        if buttons:
+            if buttons[0] == ('A', True):
+                self.recognizedTemplate = []
+                self.aPressed = True
+                self.recordGesture()
+            if buttons[0] == ('A', False):
+                if self.aPressed:
+                    self.aPressed = False
+                    template = self.checkRecognizedGesture(self.path)
+                    self.label.setText(template[0] + " | " + str(template[1]))
+                    self.path = []
+
+            if buttons[0] == ('B', True):
+                self.recognizedTemplate = []
+                self.bPressed = True
+                self.recordGesture()
+            if buttons[0] == ('B', False):
+                if self.bPressed:
+                    self.bPressed = False
+                    """
+                    # öffnet input dialog -> error (threads und so kack)
+                    name = inputDialog()
+                    if name is False:
+                        return
+                    """
+                    name = "TEMPLATE" + str(self.templateCounter)
+                    self.addTemplate(name, self.path)
+                    self.templateCounter += 1
+                    self.path = []
 
     def setLabel(self, label):
         self.label = label
         self.label.setStyleSheet("font: 24pt; color:#33a;")
 
+
+    class Template:
+        """A gesture template. Used internally by Recognizer."""
+        def __init__(self, name, points):
+            """'name' is a label identifying this gesture, and 'points' is a list of tuple co-ordinates representing the gesture positions. Example: [(1, 10), (3, 8) ...]"""
+            self.name = name
+            self.points = points
+
+    """
+    Helper functions
+    """
     def distance(self, x, y):
         dx = x[0] - y[0]
         dy = x[1] - y[1]
-        return sqrt(dx*dx - dy*dy)
+        distance = math.sqrt(abs(dx*dx - dy*dy))
+        return distance
 
     def total_length(self, point_list):
         p1 = point_list[0]
         length = 0.0
         for i in range(1, len(point_list)):
-            length += distance(p1, point_list[i])
+            length += self.distance(p1, point_list[i])
             p1 = point_list[i]
         return length
 
+    def _centroid(self, points):
+        """Returns the centre of a given set of points."""
+        x = 0.0
+        y = 0.0
+        for point in points:
+            x += point[0]
+            y += point[1]
+        x /= len(points)
+        y /= len(points)
+        return (x, y)
+
+
+    def _rotateBy(self, points, theta):
+        """Rotate a set of points by a given angle."""
+        c = self._centroid(points);
+        cos = math.cos(theta);
+        sin = math.sin(theta);
+   
+        newpoints = [];
+        for point in points:
+            qx = (point[0] - c[0]) * cos - (point[1] - c[1]) * sin + c[0]
+            qy = (point[0] - c[0]) * sin + (point[1] - c[1]) * cos + c[1]
+            newpoints.append((qx, qy))
+        return newpoints
+
+    def _boundingBox(self, points):
+        """Returns a Rectangle representing the bounding box that contains the given set of points."""
+        minX = float("+Infinity")
+        maxX = float("-Infinity")
+        minY = float("+Infinity")
+        maxY = float("-Infinity")
+
+        for point in points:
+            if point[0] < minX:
+                minX = point[0]
+            if point[0] > maxX:
+                maxX = point[0]
+            if point[1] < minY:
+                minY = point[1]
+            if point[1] > maxY:
+                maxY = point[1]
+        return (minX, minY, maxX - minX, maxY - minY)
+
+    def _pathDistance(self, pts1, pts2):
+        """'Distance' between two paths."""
+        d = 0.0;
+        length = 0
+
+        if len(pts1) > len(pts2):
+            length = len(pts2)
+        else:
+            length = len(pts1)
+
+        """
+        hier is evtl noch n fehler.
+        keine ahnung ob man das machen kann, aber wir haben ja nicht immer die gleiche anzahl
+        an punkten, wie im template
+        """
+        # for index in range(len(pts1)):  # assumes pts1.length == pts2.length
+        for index in range(length):
+            d += self.distance(pts1[index], pts2[index])
+        return d / len(pts1)
+
+    def _distanceAtAngle(self, points, T, theta):
+        """Returns the distance by which a set of points differs from a template when rotated by theta."""
+        newpoints = self._rotateBy(points, theta)
+        return self._pathDistance(newpoints, T.points)
+
+    def _distanceAtBestAngle(self, points, T, a, b, threshold):
+        """Search for the best match between a set of points and a template, using a set of tolerances. Returns a float representing this minimum distance."""
+        x1 = self.PHI * a + (1.0 - self.PHI) * b
+        f1 = self._distanceAtAngle(points, T, x1)
+        x2 = (1.0 - self.PHI) * a + self.PHI * b
+        f2 = self._distanceAtAngle(points, T, x2)
+
+        while abs(b - a) > threshold:
+            if f1 < f2:
+                b = x2
+                x2 = x1
+                f2 = f1
+                x1 = self.PHI * a + (1.0 - self.PHI) * b
+                f1 = self._distanceAtAngle(points, T, x1)
+            else:
+                a = x1
+                x1 = x2
+                f1 = f2
+                x2 = (1.0 - self.PHI) * a + self.PHI * b
+                f2 = self._distanceAtAngle(points, T, x2)
+        return min(f1, f2)
+
+    """
+    Functions of $1 recognizer
+    Based on project dollar from: http://sleepygeek.org/projects.dollar
+    """
     def resample(self, point_list, step_count=64):
-        # 1$ recognizer implementation
         newpoints = []
-        length = total_length(point_list)
+        length = self.total_length(point_list)
         stepsize = length/step_count
         curpos = 0
-        newpoints.appen(point_list[0])
+        newpoints.append(point_list[0])
         i = 1
         while i < len(point_list):
             p1 = point_list[i-1]
-            d = distance(p1, point_list[i])
+            d = self.distance(p1, point_list[i])
             if curpos + d >= stepsize:
                 nx = p1[0] + ((stepsize - curpos) / d) * (point_list[i][0] - p1[0])
                 ny = p1[1] + ((stepsize - curpos) / d) * (point_list[i][1] - p1[1])
@@ -345,41 +521,87 @@ class GestureNode(Node):
             else:
                 curpos += d
             i += 1
+        if(self.once == 0):
+            self.once = 1
         return newpoints
 
-    def saveTemplate(self, path):
-        print "saveTemplate"
-        # save path as template
+    def _rotateToZero(self, points):
+        """Rotate a set of points such that the angle between the first point and the centre point is 0."""
+        c = self._centroid(points)
+        theta = math.atan2(c[1] - points[0][1], c[0] - points[0][0])
+        return self._rotateBy(points, -theta)
 
+    def _scaleToSquare(self, points, size):
+        """Scale a scale of points to fit a given bounding box."""
+        B = self._boundingBox(points)
+        newpoints = []
+        for point in points:
+            qx = point[0] * (size / B[2])
+            qy = point[1] * (size / B[3])
+            newpoints.append((qx, qy))
+        return newpoints
+
+    def _translateToOrigin(self, points):
+        """Translate a set of points, placing the centre point at the origin."""
+        c = self._centroid(points)
+        newpoints = []
+        for point in points:
+            qx = point[0] - c[0]
+            qy = point[1] - c[1]
+            newpoints.append((qx, qy))
+        return newpoints;
+
+    # starting point for gesture recognition, after path is saved
     def checkRecognizedGesture(self, path):
-        # check for gestures
-        if recognizedGesture is not None:
-            self.label.setText(recognizedGesture)
-        else:
-            self.label.setText("no gesture recognized")
+        # uses $1 recognizer functions
+        print "1: ", path[0]
+        path = self.resample(path, len(path))
+        print "2: ", path[0]
+        path = self._rotateToZero(path)
+        print "3: ", path[0]
+        path = self._scaleToSquare(path, self.SQUARE_SIZE)
+        print "4: ", path[0]
+        path = self._translateToOrigin(path);
+        print "5: ", path[0]
 
-    def recordGesture(self, value):
-        self.path.append(value)
+        bestDistance = float("infinity")
+        bestTemplate = None
+        for template in self.templates:
+            distance = self._distanceAtBestAngle(path, template, -self.ANGLE_RANGE, +self.ANGLE_RANGE, self.ANGLE_PRECISION)
+            if distance < bestDistance:
+                bestDistance = distance
+                bestTemplate = template
+                self.recognizedTemplate = bestTemplate.points
+
+        score = 1.0 - (bestDistance / self.HALF_DIAGONAL)
+        return (bestTemplate.name, score)
+
+    # function to save gesture, while A-Button is pressed
+    def recordGesture(self):
+        self.path.append(self.inputVals)
+
+    def addTemplate(self, name, points):
+        points = self.resample(points)
+        points = self._rotateToZero(points)
+        points = self._scaleToSquare(points, self.SQUARE_SIZE)
+        points = self._translateToOrigin(points)
+        self.templates.append(self.Template(name, points))
+
+        print "Added Template", name
 
     def process(self, **kwds):
-        self.buttons = kwds['buttons']
-        if self.buttons['A'] is True:
-            self.aPressed = True
-            self.recordGesture(kwds['In'])
-        if self.buttons['A'] is False:
-            if self.aPressed:
-                self.resample(self.path)
-                self.path = []
-                self.aPressed = False
+        if self.buttons is None:
+            self.register_buttons(kwds['buttons'])
 
-        """
-        detect at least three different predefined shapes (e.g. circle, square, ...)
-        gesture data is recorded while pressing the 'A' button and analyzed on release
-        possible to learn new shapes/create new templates by using the 'B' button while recording
-        display raw data and templates as graph + a text label indicating the recognized gesture
-        """
+        self.inputVals = kwds['In']
 
-        return {'Out': self.path}
+        if self.aPressed:
+            self.recordGesture()
+
+        if self.bPressed:
+            self.recordGesture()
+
+        return {'pathOut': self.path, 'templateOut': self.recognizedTemplate}
 
 fclib.registerNodeType(GestureNode, [('Display',)])
 
@@ -427,8 +649,41 @@ if __name__ == '__main__':
     fc.connectTerminals(bufferNodeIr['dataOut'], irLightNode['In'])
     fc.connectTerminals(irLightNode['Out'], gesturePlotNode['positionIn'])
     fc.connectTerminals(irLightNode['Out'], gestureNode['In'])
-    fc.connectTerminals(gestureNode['Out'], gesturePlotNode['pathIn'])
+    fc.connectTerminals(gestureNode['pathOut'], gesturePlotNode['pathIn'])
+    fc.connectTerminals(gestureNode['templateOut'], gesturePlotNode['templateIn'])
+
+    def inputDialog():
+        (name, ok) = QtGui.QInputDialog.getText(cw, "TEXT", "Name: ", QtGui.QLineEdit.Normal, "value")
+        if ok is False:
+            return False
+        else:
+            value = str(value)
+            return value
 
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
+
+
+"""
+TODO:
+-----
+
+    Das erkannte Template wird noch an der falschen Position ausgegeben (immer rechts oben im Eck).
+
+    DialogBox zum eingeben eines Namens für ein Template produziert Thread-Fehler (Zeile 372)
+    Anhaltspunkt für Dialogboxen: Zeile 657
+    http://pyqt.sourceforge.net/Docs/PyQt4/qinputdialog.html
+    http://nullege.com/codes/search/PyQt4.QtGui.QInputDialog.getText
+
+    In der Methode _pathDistance (Zeile 454) musste ich was ändern, wo ich mir nicht sicher bin, ob des so geht.
+
+    Drei Start-Templates müssen noch angelegt werden.
+
+    Score für Übereinstimmung des Templates im Label muss noch ausgeblendet werden (evtl hier n Schwellenwert, muss aber auch nicht).
+
+    Print Ausgaben in checkRecognizedGesture (Zeile 555) und addTemplate (Zeile 590) rausnehmen
+
+    Quelle zu 1$-Recognizer evtl deutlicher angeben.
+    http://sleepygeek.org/svn_public/wsvn/dollar_recognizer/dollar.py?op=file
+"""
