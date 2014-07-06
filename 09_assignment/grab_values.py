@@ -10,7 +10,7 @@ wm = wiimote.connect(sys.argv[1])
 
 xp = yp = zp = 0
 iteration = 0
-logInit = 0        
+logInit = 1 # set to '0' to write column headers        
 onceA = 0
 
 
@@ -22,7 +22,7 @@ while True:
             print("%d,%d,%d") % (x,y,z)
         xp,yp,zp = x,y,z
         
-        logfile = open(str(iteration)+"data.csv", "a")
+        logfile = open("trainingdata/"+str(iteration)+"data.csv", "a")
         out = csv.DictWriter(logfile, ["Iteration", "X", "Y", "Z"])
         if logInit == 0:
             out.writeheader()
@@ -39,7 +39,7 @@ while True:
             onceA = 1
             print"new csv created"
             iteration += 1
-            logInit = 0
+            #logInit = 0
 
         
 wm.disconnect()
