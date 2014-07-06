@@ -39,7 +39,7 @@ while True:
             onceA = 1
             print"new csv created"
             iteration += 1
-            #logInit = 0
+            #logInit = 0 # uncomment to write column headers for any logfile
 
         
 wm.disconnect()
