@@ -28,7 +28,8 @@ while True:
             out.writeheader()
             logInit = 1
 
-        d = {"Iteration": iteration, "X": xp, "Y": yp, "Z": zp}
+        #d = {"Iteration": iteration, "X": xp, "Y": yp, "Z": zp} #uncomment to add iteration as first column
+        d = {"X": xp, "Y": yp, "Z": zp}
         out.writerow(d)
         logfile.close()
         
@@ -39,7 +40,7 @@ while True:
             onceA = 1
             print"new csv created"
             iteration += 1
-            #logInit = 0
+            #logInit = 0 # uncomment to write column headers for any logfile
 
         
 wm.disconnect()
