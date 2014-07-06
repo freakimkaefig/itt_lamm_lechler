@@ -23,7 +23,7 @@ while True:
         xp,yp,zp = x,y,z
         
         logfile = open("trainingdata/"+str(iteration)+"data.csv", "a")
-        out = csv.DictWriter(logfile, ["Iteration", "X", "Y", "Z"])
+        out = csv.DictWriter(logfile, ["X", "Y", "Z"])
         if logInit == 0:
             out.writeheader()
             logInit = 1
