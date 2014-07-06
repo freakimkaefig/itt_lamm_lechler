@@ -28,7 +28,8 @@ while True:
             out.writeheader()
             logInit = 1
 
-        d = {"Iteration": iteration, "X": xp, "Y": yp, "Z": zp}
+        #d = {"Iteration": iteration, "X": xp, "Y": yp, "Z": zp} #uncomment to add iteration as first column
+        d = {"X": xp, "Y": yp, "Z": zp}
         out.writerow(d)
         logfile.close()
         
