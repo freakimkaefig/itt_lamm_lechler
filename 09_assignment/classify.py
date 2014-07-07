@@ -152,7 +152,40 @@ class BufferNode(CtrlNode):
 fclib.registerNodeType(BufferNode, [('Data',)])
 
 ###############################################################################
-class FileReaderNode(Node):
+class FftNode(Node):
+    nodeName = "Fft"
+    """
+    Converts time of sensor inputs to frequency with a fast fourier transform.
+    """
+    def __init__(self, name):
+        terminals = {
+            'dataIn': dict(io='in'),
+            'dataOut': dict(io='out'),
+        }
+
+        self.bufferSize = bufferSize
+
+        Node.__init__(self, name, terminals=terminals)
+
+    def process(self, **kwds):
+        self.bufferSize = len(kwds['dataIn'])
+        data = kwds['dataIn']
+        Fs = int(self.bufferSize)
+        n = len(data)
+        k = np.arange(n)
+        T = n/Fs
+        frq = k/T
+        frq = frq[range(n/2)]
+        Y = np.fft.fft(data)/n
+        Y = Y[range(n/2)]
+        return {'dataOut': abs(Y)}
+
+fclib.registerNodeType(FftNode, [('Data',)])
+
+
+###############################################################################
+
+class FileReaderNode(CtrlNode):
     """
     Reads training data
     """
@@ -332,11 +365,14 @@ if __name__ == '__main__':
     #fc.connectTerminals(wiimoteNode['accelX'], xBufferNode['dataIn'])
     #fc.connectTerminals(wiimoteNode['accelY'], yBufferNode['dataIn'])
     #fc.connectTerminals(wiimoteNode['accelZ'], zBufferNode['dataIn'])
+    # fft nodes missing between bufferNodes and svmClassifierNode
     #fc.connectTerminals(xBufferNode['dataOut'], svmClassifierNode['classifyIn'])
     #fc.connectTerminals(yBufferNode['dataOut'], svmClassifierNode['classifyIn'])
     #fc.connectTerminals(zBufferNode['dataOut'], svmClassifierNode['classifyIn'])
+    # fft Node missing between fileReaderNode and svmClassifierNode
     fc.connectTerminals(fileReaderNode['trainingAndCategoryDataOut'], svmClassifierNode['trainingAndCategoryDataIn'])
     fc.connectTerminals(svmClassifierNode['categoryOut'], categoryVisualizerNode['categoryIn'])
+
 
     fileReaderNode.readFiles()
 
