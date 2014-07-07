@@ -295,9 +295,11 @@ if __name__ == '__main__':
     fc.connectTerminals(wiimoteNode['accelX'], xBufferNode['dataIn'])
     fc.connectTerminals(wiimoteNode['accelY'], yBufferNode['dataIn'])
     fc.connectTerminals(wiimoteNode['accelZ'], zBufferNode['dataIn'])
+    # fft nodes missing between bufferNodes and svmClassifierNode
     fc.connectTerminals(xBufferNode['dataOut'], svmClassifierNode['classifyIn'])
     fc.connectTerminals(yBufferNode['dataOut'], svmClassifierNode['classifyIn'])
     fc.connectTerminals(zBufferNode['dataOut'], svmClassifierNode['classifyIn'])
+    # fft Node missing between fileReaderNode and svmClassifierNode
     fc.connectTerminals(fileReaderNode['trainingAndCategoryDataOut'], svmClassifierNode['trainingAndCategoryDataIn'])
     fc.connectTerminals(svmClassifierNode['categoryOut'], categoryVisualizerNode['categoryIn'])
 
