@@ -52,5 +52,9 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
-
+# Temporary files
 _*.py
+
+#Sublime Text
+*.sublime-project
+*.sublime-workspace
