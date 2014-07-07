@@ -213,7 +213,7 @@ class FileReaderNode(CtrlNode):
         self.read_file_button = QtGui.QPushButton("read")
         self.layout.addWidget(self.read_file_button)
         self.ui.setLayout(self.layout)
-        self.read_file_button.clicked.connect(self.read_data)
+        self.read_file_button.clicked.connect(self.readFiles)
 
         
         Node.__init__(self, name, terminals=terminals)
@@ -240,8 +240,9 @@ class FileReaderNode(CtrlNode):
                 avg.append(num)
         return avg
 
-    def readFiles(self, file=None):
-        if file is None:
+    def readFiles(self):
+        passed_filename = str(self.text.text()).strip()
+        if passed_filename == '':
             filenames = os.listdir(self.directory.replace('/', ''))
             #print filenames
             for filename in filenames:
@@ -256,11 +257,27 @@ class FileReaderNode(CtrlNode):
                         if item == category:
                             self.trainingData[position]['data'].append(self.read_data(self.curdir+self.directory+filename))
 
+        else:
+            # TODO: check if passed_filename is in curdir!!!
+
+            category = ''.join([i for i in passed_filename if not i.isdigit()])
+            category = category.replace('.csv', '')
+
+            if not any(d['category'] == category for d in self.trainingData):
+                self.trainingData.append({'category': category, 'data':self.read_data(self.curdir+'/'+passed_filename)})
+            else:
+                for position, item in enumerate(self.trainingData):
+                    if item == category:
+                        self.trainingData[position]['data'].append(self.read_data(self.curdir+'/'+passed_filename))
+        """
         print self.trainingData[0]['category']
         print self.trainingData[0]['data'][0]
+        """
+
+        self.process()
 
     def process(self):
-        print "process"
+        print "FileReaderNode.process"
         return {'trainingAndCategoryDataOut': self.trainingData}
 
 
@@ -270,7 +287,7 @@ fclib.registerNodeType(FileReaderNode, [('Data',)])
 class SvmClassifierNode (Node):
     nodeName = "SvmClassifier"
     """
-    Converts time of sensor inputs to frequency with a fast fourier transform.
+    ## TODO
     """
     def __init__(self, name):
         terminals = {
@@ -279,22 +296,14 @@ class SvmClassifierNode (Node):
             'categoryOut': dict(io='out')
         }
 
-        self.bufferSize = bufferSize
+        self.recognized_category = ''
 
         Node.__init__(self, name, terminals=terminals)
 
     def process(self, **kwds):
-        self.bufferSize = len(kwds['dataIn'])
-        data = kwds['dataIn']
-        Fs = int(self.bufferSize)
-        n = len(data)
-        k = np.arange(n)
-        T = n/Fs
-        frq = k/T
-        frq = frq[range(n/2)]
-        Y = np.fft.fft(data)/n
-        Y = Y[range(n/2)]
-        return {'dataOut': abs(Y)}
+        print "SvmClassifierNode.process"
+        print kwds['trainingAndCategoryDataIn'][0]['category']
+        return {'categoryOut': self.recognized_category}
 
 fclib.registerNodeType(SvmClassifierNode, [('Data',)])
 
@@ -302,9 +311,7 @@ fclib.registerNodeType(SvmClassifierNode, [('Data',)])
 ###############################################################################
 class CategoryVisualizerNode(Node):
     """
-    Node that hosts a PyQt PlotWidget and in this case,
-    two curves for the raw data and the filtered data.
-    The raw data is displayed yellow, the filtered is red.
+    #TODO
     """
     nodeName = 'CategoryVisualizer'
 
@@ -371,7 +378,7 @@ if __name__ == '__main__':
     #fc.connectTerminals(zBufferNode['dataOut'], svmClassifierNode['classifyIn'])
     # fft Node missing between fileReaderNode and svmClassifierNode
     fc.connectTerminals(fileReaderNode['trainingAndCategoryDataOut'], svmClassifierNode['trainingAndCategoryDataIn'])
-    fc.connectTerminals(svmClassifierNode['categoryOut'], categoryVisualizerNode['categoryIn'])
+    #fc.connectTerminals(svmClassifierNode['categoryOut'], categoryVisualizerNode['categoryIn'])
 
 
     fileReaderNode.readFiles()
