@@ -152,6 +152,39 @@ class BufferNode(CtrlNode):
 fclib.registerNodeType(BufferNode, [('Data',)])
 
 ###############################################################################
+class FftNode(Node):
+    nodeName = "Fft"
+    """
+    Converts time of sensor inputs to frequency with a fast fourier transform.
+    """
+    def __init__(self, name):
+        terminals = {
+            'dataIn': dict(io='in'),
+            'dataOut': dict(io='out'),
+        }
+
+        self.bufferSize = bufferSize
+
+        Node.__init__(self, name, terminals=terminals)
+
+    def process(self, **kwds):
+        self.bufferSize = len(kwds['dataIn'])
+        data = kwds['dataIn']
+        Fs = int(self.bufferSize)
+        n = len(data)
+        k = np.arange(n)
+        T = n/Fs
+        frq = k/T
+        frq = frq[range(n/2)]
+        Y = np.fft.fft(data)/n
+        Y = Y[range(n/2)]
+        return {'dataOut': abs(Y)}
+
+fclib.registerNodeType(FftNode, [('Data',)])
+
+
+###############################################################################
+
 class FileReaderNode(CtrlNode):
     """
     Buffers the last n samples provided on input and provides them as a list of
