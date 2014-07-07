@@ -152,47 +152,84 @@ class BufferNode(CtrlNode):
 fclib.registerNodeType(BufferNode, [('Data',)])
 
 ###############################################################################
-class FileReaderNode(CtrlNode):
+class FileReaderNode(Node):
     """
-    Buffers the last n samples provided on input and provides them as a list of
-    length n on output.
-    A spinbox widget allows for setting the size of the buffer.
-    Default size is 32 samples.
+    Reads training data
     """
     nodeName = "FileReader"
-    uiTemplate = [
-        ('size',  'spin', {'value': bufferSize, 'step': 2, 'range': [0, 128]}),
-    ]
 
     def __init__(self, name):
         terminals = {
             'trainingAndCategoryDataOut': dict(io='out')
         }
+
+        self.trainingData = []
+        self.directory = '/trainingdata/'
         
         # get current directory
-        curdir = os.path.dirname(os.path.realpath("__file__"))
-        # fill activity-arrays with csv-data
-        box_csv = [curdir+"/trainingdata/box1.csv", curdir+"/trainingdata/box2.csv", curdir+"/trainingdata/box3.csv", curdir+"/trainingdata/box4.csv", curdir+"/trainingdata/box5.csv", curdir+"/trainingdata/box6.csv", curdir+"/trainingdata/box7.csv", curdir+"/trainingdata/box8.csv", curdir+"/trainingdata/box9.csv", curdir+"/trainingdata/box10.csv", curdir+"/trainingdata/box11.csv", curdir+"/trainingdata/box12.csv"]
-        walk_csv = [curdir+"/trainingdata/walk1.csv", curdir+"/trainingdata/walk2.csv", curdir+"/trainingdata/walk3.csv", curdir+"/trainingdata/walk4.csv", curdir+"/trainingdata/walk5.csv", curdir+"/trainingdata/walk6.csv", curdir+"/trainingdata/walk7.csv", curdir+"/trainingdata/walk8.csv", curdir+"/trainingdata/walk9.csv", curdir+"/trainingdata/walk10.csv", curdir+"/trainingdata/walk11.csv", curdir+"/trainingdata/walk12.csv"]
-        hop_csv = [curdir+"/trainingdata/hop1.csv", curdir+"/trainingdata/hop2.csv", curdir+"/trainingdata/hop3.csv", curdir+"/trainingdata/hop4.csv", curdir+"/trainingdata/hop5.csv", curdir+"/trainingdata/hop6.csv", curdir+"/trainingdata/hop7.csv", curdir+"/trainingdata/hop8.csv", curdir+"/trainingdata/hop9.csv", curdir+"/trainingdata/hop10.csv", curdir+"/trainingdata/hop11.csv", curdir+"/trainingdata/hop12.csv"]
-        
-        
-        
-        CtrlNode.__init__(self, name, terminals=terminals)
+        self.curdir = os.path.dirname(os.path.realpath("__file__"))
 
-    def process(self, **kwds):
+        self.ui = QtGui.QWidget()
+        self.layout = QtGui.QGridLayout()
+
+        label = QtGui.QLabel("Filename:")
+        self.layout.addWidget(label)
+        self.text = QtGui.QLineEdit()
+        self.layout.addWidget(self.text)
+
+        self.read_file_button = QtGui.QPushButton("read")
+        self.layout.addWidget(self.read_file_button)
+        self.ui.setLayout(self.layout)
+        self.read_file_button.clicked.connect(self.read_data)
+
         
-        return
-        # logfile = open(str(iteration)+"daten.csv", "a")
-        ######## TODO ########
-        # alle csv's standardisieren und speichern
-        # an fft weitereichen
-        # für jeden datensatz (für jede eingehende csv; jede der drei achsen;) fft's berechnen und speichern
-        #  samples limitieren
-        # x + y + z zusammenhängen
-        # (learn / fit() ) -> SVM -> vorhersage (Class X)
-        # lernen beim starten durch classifierNode
-        # live daten aus buffernode (standardisieren und fft): vorhersage welche activity
+        Node.__init__(self, name, terminals=terminals)
+
+    def read_data(self, filename):
+        x = []
+        y = []
+        z = []
+        avg = []
+        els = []
+        for line in open(filename, "r").readlines():
+            # check for proper file-structure
+            if(len(line.strip().split(",")) == 3):
+                _x, _y, _z = map(list,line.strip().split(","))
+            x.append(_x)
+            y.append(_y)
+            z.append(_z)
+            # precompute lists and append to list
+            for el in (_x+_y+_z):
+                # ast to float for more detailed results
+                els.append(float(el) / 3)
+            for num in els:
+                # only append numbers of the list, not the whole lists
+                avg.append(num)
+        return avg
+
+    def readFiles(self, file=None):
+        if file is None:
+            filenames = os.listdir(self.directory.replace('/', ''))
+            #print filenames
+            for filename in filenames:
+                category = ''.join([i for i in filename if not i.isdigit()])
+                category = category.replace('.csv', '')
+                #print category
+
+                if not any(d['category'] == category for d in self.trainingData):
+                    self.trainingData.append({'category': category, 'data':self.read_data(self.curdir+self.directory+filename)})
+                else:
+                    for position, item in enumerate(self.trainingData):
+                        if item == category:
+                            self.trainingData[position]['data'].append(self.read_data(self.curdir+self.directory+filename))
+
+        print self.trainingData[0]['category']
+        print self.trainingData[0]['data'][0]
+
+    def process(self):
+        print "process"
+        return {'trainingAndCategoryDataOut': self.trainingData}
+
 
 fclib.registerNodeType(FileReaderNode, [('Data',)])
 
@@ -287,19 +324,21 @@ if __name__ == '__main__':
     categoryVisualizerNode = fc.createNode('CategoryVisualizer', pos=(600, 150))
     
     # creating label for recognized activity
-    gactivityLabel = QtGui.QLabel("I'm a label")
-    layout.addWidget(gestureLabel, 2, 0)
+    activityLabel = QtGui.QLabel("I'm a label")
+    layout.addWidget(activityLabel, 2, 0)
     categoryVisualizerNode.setLabel(activityLabel)
     
     # connect Nodes
-    fc.connectTerminals(wiimoteNode['accelX'], xBufferNode['dataIn'])
-    fc.connectTerminals(wiimoteNode['accelY'], yBufferNode['dataIn'])
-    fc.connectTerminals(wiimoteNode['accelZ'], zBufferNode['dataIn'])
-    fc.connectTerminals(xBufferNode['dataOut'], svmClassifierNode['classifyIn'])
-    fc.connectTerminals(yBufferNode['dataOut'], svmClassifierNode['classifyIn'])
-    fc.connectTerminals(zBufferNode['dataOut'], svmClassifierNode['classifyIn'])
+    #fc.connectTerminals(wiimoteNode['accelX'], xBufferNode['dataIn'])
+    #fc.connectTerminals(wiimoteNode['accelY'], yBufferNode['dataIn'])
+    #fc.connectTerminals(wiimoteNode['accelZ'], zBufferNode['dataIn'])
+    #fc.connectTerminals(xBufferNode['dataOut'], svmClassifierNode['classifyIn'])
+    #fc.connectTerminals(yBufferNode['dataOut'], svmClassifierNode['classifyIn'])
+    #fc.connectTerminals(zBufferNode['dataOut'], svmClassifierNode['classifyIn'])
     fc.connectTerminals(fileReaderNode['trainingAndCategoryDataOut'], svmClassifierNode['trainingAndCategoryDataIn'])
     fc.connectTerminals(svmClassifierNode['categoryOut'], categoryVisualizerNode['categoryIn'])
+
+    fileReaderNode.readFiles()
 
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
