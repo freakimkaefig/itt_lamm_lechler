@@ -177,6 +177,7 @@ class CSVNode(CtrlNode):
         #print "cur dir: ",os.path.dirname(os.path.realpath(__file__))
         curdir = os.path.dirname(os.path.realpath(__file__))
         filenames = os.listdir(curdir)
+        print filenames
         csvs = [ filename for filename in filenames if filename.endswith( ".csv" ) ]
         
         # logfile = open(str(iteration)+"daten.csv", "a")
@@ -299,7 +300,7 @@ if __name__ == '__main__':
     xFftPlotLegend.setParentItem(xFftPlotWidget.getPlotItem())
     # connecting nodes
     fc.connectTerminals(wiimoteNode['accelX'], xBufferNode['dataIn'])
-    fc.connectTerminals(xBufferNode['dataOut'], xFftNode['dataIn'])
+    fc.connectTerminals(xBufferNode['XdataOut'], xFftNode['dataIn'])
     fc.connectTerminals(xFftNode['dataOut'], xFftPlotNode['In'])
     """
     # Y

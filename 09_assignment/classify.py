@@ -288,6 +288,7 @@ class SvmClassifierNode (Node):
     nodeName = "SvmClassifier"
     """
     ## TODO
+    # explain what this Node does (see wiimoteNode)
     """
     def __init__(self, name):
         terminals = {
@@ -311,7 +312,8 @@ fclib.registerNodeType(SvmClassifierNode, [('Data',)])
 ###############################################################################
 class CategoryVisualizerNode(Node):
     """
-    #TODO
+    ##TODO
+    # explain what this Node does (see wiimoteNode)
     """
     nodeName = 'CategoryVisualizer'
 
