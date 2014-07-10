@@ -14,6 +14,7 @@ import random
 import wiimote
 import os
 import sys
+from sklearn import svm
 
 
 # initial values
@@ -152,10 +153,12 @@ class BufferNode(CtrlNode):
 
 fclib.registerNodeType(BufferNode, [('Data',)])
 
+
 ###############################################################################
 class MergeNode(Node):
     """
-    bla
+    Merges the buffered data of all three axis (x, y, z) into one list of
+    average values and outputs it.
     """
     nodeName = "Merge"
 
@@ -176,6 +179,7 @@ class MergeNode(Node):
 
 fclib.registerNodeType(MergeNode, [('Data',)])
 
+
 ###############################################################################
 class FftNode(Node):
     nodeName = "Fft"
@@ -193,30 +197,31 @@ class FftNode(Node):
         Node.__init__(self, name, terminals=terminals)
 
     def process(self, **kwds):
-        """
-        self.bufferSize = len(kwds['dataIn'])
-        data = kwds['dataIn']
-        Fs = int(self.bufferSize)
-        n = len(data)
-        k = np.arange(n)
-        T = n/Fs
-        frq = k/T
-        frq = frq[range(n/2)]
-        Y = np.fft.fft(data)/n
-        Y = Y[range(n/2)]
-        """
-        output = [np.abs(fft(l)/len(l))[1:len(l)/2] for l in kwds['dataIn']]
-        #return {'dataOut': abs(Y)}
-        return {'dataOut': output}
+        if isinstance(kwds['dataIn'][0], list):
+            out = [np.abs(fft(l)/len(l))[1:len(l)/2] for l in kwds['dataIn']]
+        else:
+            self.bufferSize = len(kwds['dataIn'])
+            data = kwds['dataIn']
+            Fs = int(self.bufferSize)
+            n = len(data)
+            k = np.arange(n)
+            T = n/Fs
+            frq = k/T
+            frq = frq[range(n/2)]
+            Y = np.fft.fft(data)/n
+            Y = Y[range(n/2)]
+            out = abs(Y)
+
+        return {'dataOut': out}
 
 fclib.registerNodeType(FftNode, [('Data',)])
 
 
 ###############################################################################
-
 class FileReaderNode(CtrlNode):
     """
-    Reads training data
+    Reads training data from csv files and outputs the read data on one output
+    as well as the related activities on the other output.
     """
     nodeName = "FileReader"
 
@@ -228,8 +233,8 @@ class FileReaderNode(CtrlNode):
 
         self.trainingData = []
         self.categories = []
-        self.directory = '/test/'
-        
+        self.directory = '/trainingdata/'
+
         # get current directory
         self.curdir = os.path.dirname(os.path.realpath("__file__"))
 
@@ -246,21 +251,27 @@ class FileReaderNode(CtrlNode):
         self.ui.setLayout(self.layout)
         self.read_file_button.clicked.connect(self.readFiles)
 
-        
         Node.__init__(self, name, terminals=terminals)
 
+    def cut_to_same_size(self, data):
+        cutted_data = []
+        minlen = bufferSize + 2
+        for x in data:
+            if len(x) >= minlen:
+                cutted_data.append(x[:minlen])
+        return cutted_data
+
     def read_data(self, filename):
-        print filename
+        # print filename
         x = []
         y = []
         z = []
         avg = []
         els = []
         for line in open(filename, "r").readlines():
-            print line
             # check for proper file-structure
             if(len(line.strip().split(",")) == 3):
-                _x, _y, _z = map(int,line.strip().split(","))
+                _x, _y, _z = map(int, line.strip().split(","))
             x.append(_x)
             y.append(_y)
             z.append(_z)
@@ -269,35 +280,38 @@ class FileReaderNode(CtrlNode):
         return avg
 
     def readFiles(self):
-        passed_filename = str(self.text.text()).strip()
-        if passed_filename == '':
-            filenames = os.listdir(self.directory.replace('/', ''))
-            #print filenames
-            for filename in filenames:
-                category = ''.join([i for i in filename if not i.isdigit()])
-                category = category.replace('.csv', '')
-                #print category
-
-                self.categories.append(category)
-                self.trainingData.append(self.read_data(self.curdir+self.directory+filename))
-
-        else:
+        _file = str(self.text.text()).strip()
+        if _file != '':
             # TODO: check if passed_filename is in curdir!!!
-
-            category = ''.join([i for i in passed_filename if not i.isdigit()])
+            category = _file[_file.find("/")+1:_file.find(".")]
+            category = ''.join([i for i in category if not i.isdigit()])
             category = category.replace('.csv', '')
-            # print category
+            data = self.read_data(self.curdir+'/'+_file)
             self.categories.append(category)
-            self.trainingData.append(self.read_data(self.curdir+'/'+passed_filename))
+            self.trainingData.append(data)
+
+        filenames = os.listdir(self.directory.replace('/', ''))
+        for filename in filenames:
+            category = ''.join([i for i in filename if not i.isdigit()])
+            category = category.replace('.csv', '')
+            self.categories.append(category)
+            data = self.read_data(self.curdir+self.directory+filename)
+            self.trainingData.append(data)
 
         self.update()
 
     def process(self):
         # print "FileReaderNode.process"
-        return {'dataOut': self.trainingData, 'categoryOut': self.categories}
+        #print self.trainingData
+        data = self.cut_to_same_size(self.trainingData)
+        categories = self.categories
+        self.trainingData = []
+        self.categories = []
+        return {'dataOut': data, 'categoryOut': categories}
 
 
 fclib.registerNodeType(FileReaderNode, [('Data',)])
+
 
 ###############################################################################
 class SvmClassifierNode (Node):
@@ -314,14 +328,48 @@ class SvmClassifierNode (Node):
             'prediction': dict(io='out'),
         }
 
-        self.recognized_category = []
+        self.classifier = svm.SVC()
+        self.prediction = ''
 
         Node.__init__(self, name, terminals=terminals)
 
     def process(self, **kwds):
-        # print "SvmClassifierNode.process"
-        # print kwds['trainingAndCategoryDataIn'][0]['category']
-        return {'prediction': self.recognized_category}
+        if kwds['dataIn'] is not None and kwds['categoryIn'] is not None:
+            self.classifier.fit(kwds['dataIn'], kwds['categoryIn'])
+
+        # test prediciton with csv data
+        filename = os.path.dirname(os.path.realpath("__file__")) + '/trainingdata/hop11.csv'
+        x = []
+        y = []
+        z = []
+        avg = []
+        els = []
+        for line in open(filename, "r").readlines():
+            # check for proper file-structure
+            if(len(line.strip().split(",")) == 3):
+                _x, _y, _z = map(int, line.strip().split(","))
+            x.append(_x)
+            y.append(_y)
+            z.append(_z)
+            # precompute lists and append to list
+            avg.append((_x+_y+_z)/3)
+        avg = avg[:bufferSize]
+        buffersize = len(avg)
+        data = avg
+        Fs = int(buffersize)
+        n = len(data)
+        k = np.arange(n)
+        T = n/Fs
+        frq = k/T
+        frq = frq[range(n/2)]
+        Y = np.fft.fft(data)/n
+        Y = Y[range(n/2)]
+        out = abs(Y)
+        self.prediction = self.classifier.predict(out)
+
+        #self.prediction = self.classifier.predict(kwds['classifyIn'])
+        print self.prediction
+        return {'prediction': self.prediction}
 
 fclib.registerNodeType(SvmClassifierNode, [('Data',)])
 
@@ -340,18 +388,17 @@ class CategoryVisualizerNode(Node):
         }
         Node.__init__(self, name, terminals)
 
-        
     def setLabel(self, label):
         self.label = label
         self.label.setStyleSheet("font: 24pt; color:#33a;")
 
     def process(self, **kwds):
-        return
+        self.label.setText(kwds['categoryIn'][0])
 
 fclib.registerNodeType(CategoryVisualizerNode, [('Display',)])
 
-###############################################################################
 
+###############################################################################
 if __name__ == '__main__':
     app = QtGui.QApplication([])
     win = QtGui.QMainWindow()
@@ -373,24 +420,31 @@ if __name__ == '__main__':
     # wiimote node
     wiimoteNode = fc.createNode('Wiimote', pos=(0, 0), )
     wiimoteNode.connect_wiimote()
-    
-    xBufferNode = fc.createNode('Buffer', pos=(150, -150))
-    yBufferNode = fc.createNode('Buffer', pos=(150, 0))
-    zBufferNode = fc.createNode('Buffer', pos=(150, 150))
-    mergeNode = fc.createNode('Merge', pos=(300, 300))
-    fileReaderNode = fc.createNode('FileReader', pos=(300, 150))
-    svmClassifierNode = fc.createNode('SvmClassifier', pos=(450, 150))
-    categoryVisualizerNode = fc.createNode('CategoryVisualizer', pos=(600, 150))
+
+    xBufferNode = fc.createNode('Buffer', pos=(150, 0))
+    yBufferNode = fc.createNode('Buffer', pos=(150, 150))
+    zBufferNode = fc.createNode('Buffer', pos=(150, -150))
+    mergeNode = fc.createNode('Merge', pos=(300, 150))
+    fileReader = fc.createNode('FileReader', pos=(300, -150))
+    svmClassifier = fc.createNode('SvmClassifier', pos=(600, 0))
+    display = fc.createNode('CategoryVisualizer', pos=(750, 0))
 
     # FFT nodes
-    liveFftNode = fc.createNode('Fft', pos=(450, 300))
-    trainingFftNode = fc.createNode('Fft', pos=(150, 300))
-    
+    liveFft = fc.createNode('Fft', pos=(450, 150))
+    trainingFft = fc.createNode('Fft', pos=(450, -150))
+
+    # creating a label for information
+    text = "The tool predicts your activity while acting with the wiimote"
+    text += "\nbased on trained data and a machine learning algorithm."
+    infoText = QtGui.QLabel(text)
+    infoText.setStyleSheet("font: 12pt; color:#000;")
+    layout.addWidget(infoText, 2, 0)
+
     # creating label for recognized activity
-    activityLabel = QtGui.QLabel("I'm a label")
-    layout.addWidget(activityLabel, 2, 0)
-    categoryVisualizerNode.setLabel(activityLabel)
-    
+    activityLabel = QtGui.QLabel("initializing")
+    layout.addWidget(activityLabel, 3, 0)
+    display.setLabel(activityLabel)
+
     # connect Nodes
     fc.connectTerminals(wiimoteNode['accelX'], xBufferNode['dataIn'])
     fc.connectTerminals(wiimoteNode['accelY'], yBufferNode['dataIn'])
@@ -400,18 +454,16 @@ if __name__ == '__main__':
     fc.connectTerminals(yBufferNode['dataOut'], mergeNode['yIn'])
     fc.connectTerminals(zBufferNode['dataOut'], mergeNode['zIn'])
     # fft nodes for live data
-    fc.connectTerminals(mergeNode['dataOut'], liveFftNode['dataIn'])
-    fc.connectTerminals(fileReaderNode['dataOut'], trainingFftNode['dataIn'])
-    fc.connectTerminals(fileReaderNode['categoryOut'], svmClassifierNode['categoryIn'])
+    fc.connectTerminals(mergeNode['dataOut'], liveFft['dataIn'])
+    fc.connectTerminals(fileReader['dataOut'], trainingFft['dataIn'])
+    # connecting support vector machine
+    fc.connectTerminals(fileReader['categoryOut'], svmClassifier['categoryIn'])
+    fc.connectTerminals(liveFft['dataOut'], svmClassifier['classifyIn'])
+    fc.connectTerminals(trainingFft['dataOut'], svmClassifier['dataIn'])
+    # connecting visual output of prediction
+    fc.connectTerminals(svmClassifier['prediction'], display['categoryIn'])
 
-    fc.connectTerminals(liveFftNode['dataOut'], svmClassifierNode['classifyIn'])
-    fc.connectTerminals(trainingFftNode['dataOut'], svmClassifierNode['dataIn'])
-    
-    # fft Node missing between fileReaderNode and svmClassifierNode
-    fc.connectTerminals(svmClassifierNode['prediction'], categoryVisualizerNode['categoryIn'])
-
-
-    #fileReaderNode.readFiles()
+    fileReader.readFiles()
 
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
