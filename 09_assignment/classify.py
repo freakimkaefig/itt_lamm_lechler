@@ -18,7 +18,7 @@ from sklearn import svm
 
 
 # initial values
-bufferSize = 100
+size = 50
 
 
 ###############################################################################
@@ -122,16 +122,16 @@ fclib.registerNodeType(WiimoteNode, [('Sensor',)])
 
 
 ###############################################################################
-class BufferNode(CtrlNode):
+class sizeNode(CtrlNode):
     """
-    Buffers the last n samples provided on input and provides them as a list of
+    sizes the last n samples provided on input and provides them as a list of
     length n on output.
-    A spinbox widget allows for setting the size of the buffer.
+    A spinbox widget allows for setting the size of the size.
     Default size is 32 samples.
     """
-    nodeName = "Buffer"
+    nodeName = "size"
     uiTemplate = [
-        ('size',  'spin', {'value': bufferSize, 'step': 2, 'range': [0, 128]}),
+        ('size',  'spin', {'value': size, 'step': 10, 'range': [0, 500]}),
     ]
 
     def __init__(self, name):
@@ -139,25 +139,25 @@ class BufferNode(CtrlNode):
             'dataIn': dict(io='in'),
             'dataOut': dict(io='out'),
         }
-        self._buffer = np.array([])
+        self._size = np.array([])
 
         CtrlNode.__init__(self, name, terminals=terminals)
 
     def process(self, **kwds):
         size = int(self.ctrls['size'].value())
-        buffersize = size
-        self._buffer = np.append(self._buffer, kwds['dataIn'])
-        self._buffer = self._buffer[-size:]
-        output = self._buffer
+        size = size
+        self._size = np.append(self._size, kwds['dataIn'])
+        self._size = self._size[-(size):]
+        output = self._size
         return {'dataOut': output}
 
-fclib.registerNodeType(BufferNode, [('Data',)])
+fclib.registerNodeType(sizeNode, [('Data',)])
 
 
 ###############################################################################
 class MergeNode(Node):
     """
-    Merges the buffered data of all three axis (x, y, z) into one list of
+    Merges the sizeed data of all three axis (x, y, z) into one list of
     average values and outputs it.
     """
     nodeName = "Merge"
@@ -169,13 +169,14 @@ class MergeNode(Node):
             'zIn': dict(io='in'),
             'dataOut': dict(io='out'),
         }
-        self._buffer = np.array([])
+        self._size = []
 
         Node.__init__(self, name, terminals=terminals)
 
     def process(self, **kwds):
-        output = ((kwds['xIn'] + kwds['yIn'] + kwds['zIn']) / 3)
-        return {'dataOut': output}
+        self._size = []
+        self._size.append((kwds['xIn'] + kwds['yIn'] + kwds['zIn']) / 3)
+        return {'dataOut': self._size}
 
 fclib.registerNodeType(MergeNode, [('Data',)])
 
@@ -192,25 +193,12 @@ class FftNode(Node):
             'dataOut': dict(io='out'),
         }
 
-        self.bufferSize = bufferSize
+        self.size = size
 
         Node.__init__(self, name, terminals=terminals)
 
     def process(self, **kwds):
-        if isinstance(kwds['dataIn'][0], list):
-            out = [np.abs(fft(l)/len(l))[1:len(l)/2] for l in kwds['dataIn']]
-        else:
-            self.bufferSize = len(kwds['dataIn'])
-            data = kwds['dataIn']
-            Fs = int(self.bufferSize)
-            n = len(data)
-            k = np.arange(n)
-            T = n/Fs
-            frq = k/T
-            frq = frq[range(n/2)]
-            Y = np.fft.fft(data)/n
-            Y = Y[range(n/2)]
-            out = abs(Y)
+        out = [np.abs(fft(l)/len(l))[1:len(l)/2] for l in kwds['dataIn']]
 
         return {'dataOut': out}
 
@@ -220,7 +208,8 @@ fclib.registerNodeType(FftNode, [('Data',)])
 ###############################################################################
 class FileReaderNode(CtrlNode):
     """
-    Reads training data from csv files and outputs the read data on one output
+    Reads training data from csv files in the directory 'trainingdata'
+    and outputs the read data on one output
     as well as the related activities on the other output.
     """
     nodeName = "FileReader"
@@ -255,14 +244,13 @@ class FileReaderNode(CtrlNode):
 
     def cut_to_same_size(self, data):
         cutted_data = []
-        minlen = bufferSize + 2
+        minlen = size
         for x in data:
             if len(x) >= minlen:
                 cutted_data.append(x[:minlen])
         return cutted_data
 
     def read_data(self, filename):
-        # print filename
         x = []
         y = []
         z = []
@@ -280,6 +268,8 @@ class FileReaderNode(CtrlNode):
         return avg
 
     def readFiles(self):
+        self.clear()
+
         _file = str(self.text.text()).strip()
         if _file != '':
             # TODO: check if passed_filename is in curdir!!!
@@ -298,16 +288,17 @@ class FileReaderNode(CtrlNode):
             data = self.read_data(self.curdir+self.directory+filename)
             self.trainingData.append(data)
 
+        self.trainingData = self.cut_to_same_size(self.trainingData)
+        self.update()
+        self.clear()
+
+    def clear(self):
+        self.trainingData = []
+        self.categories = []
         self.update()
 
     def process(self):
-        # print "FileReaderNode.process"
-        #print self.trainingData
-        data = self.cut_to_same_size(self.trainingData)
-        categories = self.categories
-        self.trainingData = []
-        self.categories = []
-        return {'dataOut': data, 'categoryOut': categories}
+        return {'dataOut': self.trainingData, 'categoryOut': self.categories}
 
 
 fclib.registerNodeType(FileReaderNode, [('Data',)])
@@ -317,8 +308,12 @@ fclib.registerNodeType(FileReaderNode, [('Data',)])
 class SvmClassifierNode (Node):
     nodeName = "SvmClassifier"
     """
-    ## TODO
-    # explain what this Node does (see wiimoteNode)
+    The core of the SvmClassifierNode is a support vector machine.
+    It is trained by data on the 'dataIn'-Input with the related activities
+    on the 'categoryIn'-Input.
+    The support vector machine compares the live data on the
+    'classifyIn'-Input with the trained activities and outputs a prediction
+    on the 'prediction'-Output
     """
     def __init__(self, name):
         terminals = {
@@ -329,46 +324,25 @@ class SvmClassifierNode (Node):
         }
 
         self.classifier = svm.SVC()
-        self.prediction = ''
+        self.prediction = []
 
         Node.__init__(self, name, terminals=terminals)
 
     def process(self, **kwds):
-        if kwds['dataIn'] is not None and kwds['categoryIn'] is not None:
+        if kwds['dataIn'] and kwds['categoryIn']:
             self.classifier.fit(kwds['dataIn'], kwds['categoryIn'])
 
-        # test prediciton with csv data
-        filename = os.path.dirname(os.path.realpath("__file__")) + '/trainingdata/hop11.csv'
-        x = []
-        y = []
-        z = []
-        avg = []
-        els = []
-        for line in open(filename, "r").readlines():
-            # check for proper file-structure
-            if(len(line.strip().split(",")) == 3):
-                _x, _y, _z = map(int, line.strip().split(","))
-            x.append(_x)
-            y.append(_y)
-            z.append(_z)
-            # precompute lists and append to list
-            avg.append((_x+_y+_z)/3)
-        avg = avg[:bufferSize]
-        buffersize = len(avg)
-        data = avg
-        Fs = int(buffersize)
-        n = len(data)
-        k = np.arange(n)
-        T = n/Fs
-        frq = k/T
-        frq = frq[range(n/2)]
-        Y = np.fft.fft(data)/n
-        Y = Y[range(n/2)]
-        out = abs(Y)
-        self.prediction = self.classifier.predict(out)
+        # check if size of live data is filled
+        loaded = (len(kwds['classifyIn'][0]) * 2) + 2
+        load = size
+        if loaded == load:
+            self.prediction = self.classifier.predict(kwds['classifyIn'])
+        else:
+            # display status (size is loading)
+            self.prediction = []
+            status = 'size loading: ' + str(loaded) + '/' + str(load)
+            self.prediction.append(status)
 
-        #self.prediction = self.classifier.predict(kwds['classifyIn'])
-        print self.prediction
         return {'prediction': self.prediction}
 
 fclib.registerNodeType(SvmClassifierNode, [('Data',)])
@@ -377,8 +351,8 @@ fclib.registerNodeType(SvmClassifierNode, [('Data',)])
 ###############################################################################
 class CategoryVisualizerNode(Node):
     """
-    ##TODO
-    # explain what this Node does (see wiimoteNode)
+    The CategoryVisualizerNode receives a prediction or a status for displaying
+    from the SvmClassifierNode
     """
     nodeName = 'CategoryVisualizer'
 
@@ -393,6 +367,8 @@ class CategoryVisualizerNode(Node):
         self.label.setStyleSheet("font: 24pt; color:#33a;")
 
     def process(self, **kwds):
+        # prediction of svm is placed in a list of strings,
+        # so output the first value
         self.label.setText(kwds['categoryIn'][0])
 
 fclib.registerNodeType(CategoryVisualizerNode, [('Display',)])
@@ -400,6 +376,8 @@ fclib.registerNodeType(CategoryVisualizerNode, [('Display',)])
 
 ###############################################################################
 if __name__ == '__main__':
+    print "Press sync on your WiiMote"
+
     app = QtGui.QApplication([])
     win = QtGui.QMainWindow()
     win.setWindowTitle('Activity tracker')
@@ -421,12 +399,21 @@ if __name__ == '__main__':
     wiimoteNode = fc.createNode('Wiimote', pos=(0, 0), )
     wiimoteNode.connect_wiimote()
 
-    xBufferNode = fc.createNode('Buffer', pos=(150, 0))
-    yBufferNode = fc.createNode('Buffer', pos=(150, 150))
-    zBufferNode = fc.createNode('Buffer', pos=(150, -150))
+    # create sizeNodes for each axis
+    xsizeNode = fc.createNode('size', pos=(150, 0))
+    ysizeNode = fc.createNode('size', pos=(150, 150))
+    zsizeNode = fc.createNode('size', pos=(150, -150))
+
+    # mergeNode merges the sizeed data of three axes
     mergeNode = fc.createNode('Merge', pos=(300, 150))
+
+    # fileReader to read csv training data
     fileReader = fc.createNode('FileReader', pos=(300, -150))
+
+    # svmClassifier gets feeded by training data, categories and live data
     svmClassifier = fc.createNode('SvmClassifier', pos=(600, 0))
+
+    # node to display the predicted activity
     display = fc.createNode('CategoryVisualizer', pos=(750, 0))
 
     # FFT nodes
@@ -446,14 +433,14 @@ if __name__ == '__main__':
     display.setLabel(activityLabel)
 
     # connect Nodes
-    fc.connectTerminals(wiimoteNode['accelX'], xBufferNode['dataIn'])
-    fc.connectTerminals(wiimoteNode['accelY'], yBufferNode['dataIn'])
-    fc.connectTerminals(wiimoteNode['accelZ'], zBufferNode['dataIn'])
+    fc.connectTerminals(wiimoteNode['accelX'], xsizeNode['dataIn'])
+    fc.connectTerminals(wiimoteNode['accelY'], ysizeNode['dataIn'])
+    fc.connectTerminals(wiimoteNode['accelZ'], zsizeNode['dataIn'])
     # merge x,y,z values
-    fc.connectTerminals(xBufferNode['dataOut'], mergeNode['xIn'])
-    fc.connectTerminals(yBufferNode['dataOut'], mergeNode['yIn'])
-    fc.connectTerminals(zBufferNode['dataOut'], mergeNode['zIn'])
-    # fft nodes for live data
+    fc.connectTerminals(xsizeNode['dataOut'], mergeNode['xIn'])
+    fc.connectTerminals(ysizeNode['dataOut'], mergeNode['yIn'])
+    fc.connectTerminals(zsizeNode['dataOut'], mergeNode['zIn'])
+    # fft nodes for live data and training data
     fc.connectTerminals(mergeNode['dataOut'], liveFft['dataIn'])
     fc.connectTerminals(fileReader['dataOut'], trainingFft['dataIn'])
     # connecting support vector machine
@@ -463,8 +450,29 @@ if __name__ == '__main__':
     # connecting visual output of prediction
     fc.connectTerminals(svmClassifier['prediction'], display['categoryIn'])
 
+    # read training data on startup
     fileReader.readFiles()
 
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
+
+    """
+    TODO:
+
+    wenn die size in einem sizenode angepasst wird,
+    müssen auch die anderen angepasst werden.
+    FileReaderNode muss Daten neu einlesen, wenn sich size-size ändert.
+    Alternative: feste size ;)
+
+    Evtl: buffersize anpassen für bessere erkennung (Zeile 21)
+
+    Evtl: weitere eindeutig unterscheidbare Aktivität
+    (habs mit trommelwirbel ['drum'] probiert, aber jetzt erkennt er nur:
+        walk --> wiimote ruhig am tisch oder ganz vorsichtiges gehen
+        drum --> schneller Trommelwirbel am Tisch )
+
+    Kommentare einfügen
+
+    PEP8
+    """
