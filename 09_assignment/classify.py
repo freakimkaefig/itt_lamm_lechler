@@ -18,10 +18,10 @@ from sklearn import svm
 
 
 # initial values
-size = 50
+size = 100
+########################################################################
 
 
-###############################################################################
 class WiimoteNode(Node):
     """
     Outputs sensor data from a Wiimote.
@@ -325,6 +325,7 @@ class SvmClassifierNode (Node):
 
         self.classifier = svm.SVC()
         self.prediction = []
+        self.oldData = []
 
         Node.__init__(self, name, terminals=terminals)
 
@@ -332,15 +333,17 @@ class SvmClassifierNode (Node):
         if kwds['dataIn'] and kwds['categoryIn']:
             self.classifier.fit(kwds['dataIn'], kwds['categoryIn'])
 
-        # check if size of live data is filled
-        loaded = (len(kwds['classifyIn'][0]) * 2) + 2
-        load = size
-        if loaded == load:
+        # check if training-data was loaded
+        loaded = len(kwds['classifyIn'][0])
+        # number of files in trainingdata dir
+        load = len(os.listdir('/trainingdata/'.replace('/', '')))
+        if loaded >= load:
+            # start live recognition
             self.prediction = self.classifier.predict(kwds['classifyIn'])
         else:
             # display status (size is loading)
             self.prediction = []
-            status = 'size loading: ' + str(loaded) + '/' + str(load)
+            status = 'loading training-data: ' + str(loaded) + '/' + str(load)
             self.prediction.append(status)
 
         return {'prediction': self.prediction}
@@ -362,14 +365,40 @@ class CategoryVisualizerNode(Node):
         }
         Node.__init__(self, name, terminals)
 
+        self.recog = []
+
     def setLabel(self, label):
         self.label = label
         self.label.setStyleSheet("font: 24pt; color:#33a;")
 
     def process(self, **kwds):
-        # prediction of svm is placed in a list of strings,
-        # so output the first value
-        self.label.setText(kwds['categoryIn'][0])
+        # collect data
+        self.recog.append(kwds['categoryIn'][0])
+
+        if "loading" not in kwds['categoryIn'][0]:
+            if len(self.recog) > 99:
+                # cut of old data
+                self.recog = self.recog[-100:]
+
+                # create dict with key:value pairs,
+                # where value is the occurence of a key
+                aDict = dict((i, self.recog.count(i)) for i in self.recog)
+
+                # split keys and values into seperate lists
+                activityValues = list(aDict.values())
+                activityKeys = list(aDict.keys())
+
+                # displayed activity = highest occurence of recognized activity
+                # this slows down the recognition process
+                # but improves recognition
+                text = activityKeys[activityValues.index(max(activityValues))]
+
+                self.label.setText(text)
+            else:
+                self.label.setText('Collecting data...')
+
+        else:
+            self.label.setText(kwds['categoryIn'][0])
 
 fclib.registerNodeType(CategoryVisualizerNode, [('Display',)])
 
@@ -464,15 +493,18 @@ if __name__ == '__main__':
     müssen auch die anderen angepasst werden.
     FileReaderNode muss Daten neu einlesen, wenn sich size-size ändert.
     Alternative: feste size ;)
-
-    Evtl: buffersize anpassen für bessere erkennung (Zeile 21)
+    => Versteh nicht was du meinst...!?
 
     Evtl: weitere eindeutig unterscheidbare Aktivität
     (habs mit trommelwirbel ['drum'] probiert, aber jetzt erkennt er nur:
         walk --> wiimote ruhig am tisch oder ganz vorsichtiges gehen
         drum --> schneller Trommelwirbel am Tisch )
 
-    Kommentare einfügen
+    FileReaderNode auskommentieren
 
-    PEP8
+    PEP8 (is atm drin, aber man weiß ja nie am ende...)
+
+    Kommentar in Z.275?
+    
+    "a short description of the movements that can be distinguished"
     """
