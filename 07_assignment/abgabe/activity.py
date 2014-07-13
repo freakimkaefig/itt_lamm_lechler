@@ -234,6 +234,7 @@ class FftNode(Node):
     def process(self, **kwds):
         self.bufferSize = len(kwds['dataIn'])
         data = kwds['dataIn']
+        print data
         Fs = int(self.bufferSize)
         n = len(data)
         k = np.arange(n)
