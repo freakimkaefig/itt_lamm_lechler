@@ -210,7 +210,7 @@ class FileReaderNode(CtrlNode):
     """
     Reads training data from csv files in the directory 'trainingdata'
     and outputs the read data on one output
-    as well as the related activities on the other output.
+    as well as the related activities on another output.
     """
     nodeName = "FileReader"
 
@@ -241,7 +241,10 @@ class FileReaderNode(CtrlNode):
         self.read_file_button.clicked.connect(self.readFiles)
 
         Node.__init__(self, name, terminals=terminals)
-
+    
+    # receives an array of data
+    # cuts it to a set length ('size')
+    # and returns it
     def cut_to_same_size(self, data):
         cutted_data = []
         minlen = size
@@ -270,21 +273,28 @@ class FileReaderNode(CtrlNode):
     def readFiles(self):
         self.clear()
 
+        # manual import:
         _file = str(self.text.text()).strip()
         if _file != '':
             # TODO: check if passed_filename is in curdir!!!
+            # receive category name from filename
             category = _file[_file.find("/")+1:_file.find(".")]
             category = ''.join([i for i in category if not i.isdigit()])
             category = category.replace('.csv', '')
+            # set training data
             data = self.read_data(self.curdir+'/'+_file)
             self.categories.append(category)
             self.trainingData.append(data)
 
+        # initial training-data:
+        # get all file names in self.directory
         filenames = os.listdir(self.directory.replace('/', ''))
         for filename in filenames:
+            # receive category name from filename
             category = ''.join([i for i in filename if not i.isdigit()])
             category = category.replace('.csv', '')
             self.categories.append(category)
+            # set training data
             data = self.read_data(self.curdir+self.directory+filename)
             self.trainingData.append(data)
 
@@ -337,7 +347,7 @@ class SvmClassifierNode (Node):
         loaded = len(kwds['classifyIn'][0])
         # number of files in trainingdata dir
         load = len(os.listdir('/trainingdata/'.replace('/', '')))
-        if loaded >= load:
+        if loaded > load:
             # start live recognition
             self.prediction = self.classifier.predict(kwds['classifyIn'])
         else:
@@ -504,7 +514,7 @@ if __name__ == '__main__':
 
     PEP8 (is atm drin, aber man weiß ja nie am ende...)
 
-    Kommentar in Z.275?
+    Kommentar in Z.279?
     
     "a short description of the movements that can be distinguished"
     """
