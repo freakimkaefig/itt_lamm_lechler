@@ -522,7 +522,6 @@ if __name__ == '__main__':
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
-<<<<<<< HEAD
 
     """
     TODO:
@@ -544,5 +543,3 @@ if __name__ == '__main__':
     
     "a short description of the movements that can be distinguished"
     """
-=======
->>>>>>> 6b7abffb9ad90f498c2265dc87f0a9b067cdd549
