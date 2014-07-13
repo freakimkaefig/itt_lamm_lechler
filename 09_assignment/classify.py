@@ -2,6 +2,19 @@
 # coding: utf-8
 # -*- coding: utf-8 -*-
 
+"""
+This program predicts activities while acting with the wiimote.
+It reads csv training data from the '/trainingdata/' directory
+or given on text input of the FileReaderNode.
+Once the implemented support vector machine is trained with data
+it can predict what you're currently doing with the wiimote.
+
+The movements implemented in this version are:
+  - sitting: sitting on a chair with the wiimote in the pocket
+  - walking: walking with the wiimote in the pocket
+  - hopping: hopping rapidly with the wiimote in the pocket
+"""
+
 
 from pyqtgraph.flowchart import Flowchart, Node
 from pyqtgraph.flowchart.library.common import CtrlNode
@@ -18,6 +31,7 @@ from sklearn import svm
 
 
 # initial values
+# for ease of use, the buffers aren't adjustable
 size = 100
 ########################################################################
 
@@ -122,16 +136,17 @@ fclib.registerNodeType(WiimoteNode, [('Sensor',)])
 
 
 ###############################################################################
-class sizeNode(CtrlNode):
+class BufferNode(CtrlNode):
     """
-    sizes the last n samples provided on input and provides them as a list of
+    Buffers the last n samples provided on input and provides them as a list of
     length n on output.
-    A spinbox widget allows for setting the size of the size.
+    A spinbox widget allows for setting the size of the buffer.
     Default size is 32 samples.
     """
-    nodeName = "size"
+    nodeName = "Buffer"
     uiTemplate = [
-        ('size',  'spin', {'value': size, 'step': 10, 'range': [0, 500]}),
+        ('size',  'spin', {'value': size, 'step': 0, 'range': [0, 500]}),
+        # buffer fixed for ease of use -----------^
     ]
 
     def __init__(self, name):
@@ -151,7 +166,7 @@ class sizeNode(CtrlNode):
         output = self._size
         return {'dataOut': output}
 
-fclib.registerNodeType(sizeNode, [('Data',)])
+fclib.registerNodeType(BufferNode, [('Data',)])
 
 
 ###############################################################################
@@ -241,18 +256,20 @@ class FileReaderNode(CtrlNode):
         self.read_file_button.clicked.connect(self.readFiles)
 
         Node.__init__(self, name, terminals=terminals)
-    
+
     # receives an array of data
-    # cuts it to a set length ('size')
+    # cuts it to the same length as the buffers
     # and returns it
     def cut_to_same_size(self, data):
         cutted_data = []
         minlen = size
         for x in data:
             if len(x) >= minlen:
-                cutted_data.append(x[:minlen])
+                cutted_data.append(x[-minlen:])
         return cutted_data
 
+    # reads csv data of the given file
+    # and returns array of mean values
     def read_data(self, filename):
         x = []
         y = []
@@ -266,27 +283,10 @@ class FileReaderNode(CtrlNode):
             x.append(_x)
             y.append(_y)
             z.append(_z)
-            # precompute lists and append to list
             avg.append((_x+_y+_z)/3)
         return avg
 
-    def readFiles(self):
-        self.clear()
-
-        # manual import:
-        _file = str(self.text.text()).strip()
-        if _file != '':
-            # TODO: check if passed_filename is in curdir!!!
-            # receive category name from filename
-            category = _file[_file.find("/")+1:_file.find(".")]
-            category = ''.join([i for i in category if not i.isdigit()])
-            category = category.replace('.csv', '')
-            # set training data
-            data = self.read_data(self.curdir+'/'+_file)
-            self.categories.append(category)
-            self.trainingData.append(data)
-
-        # initial training-data:
+    def checkDirectory(self):
         # get all file names in self.directory
         filenames = os.listdir(self.directory.replace('/', ''))
         for filename in filenames:
@@ -297,6 +297,30 @@ class FileReaderNode(CtrlNode):
             # set training data
             data = self.read_data(self.curdir+self.directory+filename)
             self.trainingData.append(data)
+
+        self.trainingData = self.cut_to_same_size(self.trainingData)
+        self.update()
+        self.clear()
+
+    def readFiles(self):
+        self.clear()
+        self.text.setStyleSheet('color:black')
+        # manual import:
+        _file = str(self.text.text()).strip()
+        if _file != '':  # if text input of node isn't empty
+            if os.path.isfile(_file):  # check if file exists
+                self.text.setStyleSheet('color:green')  # visual feedback
+                # extract category name from filename (Pattern: activity1.csv)
+                category = _file[_file.find("/")+1:_file.find(".")]
+                category = ''.join([i for i in category if not i.isdigit()])
+                category = category.replace('.csv', '')
+                # set training data and categories
+                data = self.read_data(self.curdir+'/'+_file)
+                self.categories.append(category)
+                self.trainingData.append(data)
+            else:
+                # set text color to red -> file doesn't exist
+                self.text.setStyleSheet('color:red')
 
         self.trainingData = self.cut_to_same_size(self.trainingData)
         self.update()
@@ -341,6 +365,7 @@ class SvmClassifierNode (Node):
 
     def process(self, **kwds):
         if kwds['dataIn'] and kwds['categoryIn']:
+            # train support vector machine
             self.classifier.fit(kwds['dataIn'], kwds['categoryIn'])
 
         # check if training-data was loaded
@@ -388,9 +413,9 @@ class CategoryVisualizerNode(Node):
         self.recog.append(kwds['categoryIn'][0])
 
         if "loading" not in kwds['categoryIn'][0]:
-            if len(self.recog) > 99:
+            if len(self.recog) > size - 1:
                 # cut of old data
-                self.recog = self.recog[-100:]
+                self.recog = self.recog[-size:]
 
                 # create dict with key:value pairs,
                 # where value is the occurence of a key
@@ -441,9 +466,9 @@ if __name__ == '__main__':
     wiimoteNode.connect_wiimote()
 
     # create sizeNodes for each axis
-    xsizeNode = fc.createNode('size', pos=(150, 0))
-    ysizeNode = fc.createNode('size', pos=(150, 150))
-    zsizeNode = fc.createNode('size', pos=(150, -150))
+    xBufferNode = fc.createNode('Buffer', pos=(150, 0))
+    yBufferNode = fc.createNode('Buffer', pos=(150, 150))
+    zBufferNode = fc.createNode('Buffer', pos=(150, -150))
 
     # mergeNode merges the sizeed data of three axes
     mergeNode = fc.createNode('Merge', pos=(300, 150))
@@ -474,13 +499,13 @@ if __name__ == '__main__':
     display.setLabel(activityLabel)
 
     # connect Nodes
-    fc.connectTerminals(wiimoteNode['accelX'], xsizeNode['dataIn'])
-    fc.connectTerminals(wiimoteNode['accelY'], ysizeNode['dataIn'])
-    fc.connectTerminals(wiimoteNode['accelZ'], zsizeNode['dataIn'])
+    fc.connectTerminals(wiimoteNode['accelX'], xBufferNode['dataIn'])
+    fc.connectTerminals(wiimoteNode['accelY'], yBufferNode['dataIn'])
+    fc.connectTerminals(wiimoteNode['accelZ'], zBufferNode['dataIn'])
     # merge x,y,z values
-    fc.connectTerminals(xsizeNode['dataOut'], mergeNode['xIn'])
-    fc.connectTerminals(ysizeNode['dataOut'], mergeNode['yIn'])
-    fc.connectTerminals(zsizeNode['dataOut'], mergeNode['zIn'])
+    fc.connectTerminals(xBufferNode['dataOut'], mergeNode['xIn'])
+    fc.connectTerminals(yBufferNode['dataOut'], mergeNode['yIn'])
+    fc.connectTerminals(zBufferNode['dataOut'], mergeNode['zIn'])
     # fft nodes for live data and training data
     fc.connectTerminals(mergeNode['dataOut'], liveFft['dataIn'])
     fc.connectTerminals(fileReader['dataOut'], trainingFft['dataIn'])
@@ -492,11 +517,12 @@ if __name__ == '__main__':
     fc.connectTerminals(svmClassifier['prediction'], display['categoryIn'])
 
     # read training data on startup
-    fileReader.readFiles()
+    fileReader.checkDirectory()
 
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
+<<<<<<< HEAD
 
     """
     TODO:
@@ -518,3 +544,5 @@ if __name__ == '__main__':
     
     "a short description of the movements that can be distinguished"
     """
+=======
+>>>>>>> 6b7abffb9ad90f498c2265dc87f0a9b067cdd549
