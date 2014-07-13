@@ -522,24 +522,3 @@ if __name__ == '__main__':
     win.show()
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
-
-    """
-    TODO:
-
-    wenn die size in einem sizenode angepasst wird,
-    müssen auch die anderen angepasst werden.
-    FileReaderNode muss Daten neu einlesen, wenn sich size-size ändert.
-    Alternative: feste size ;)
-    => Versteh nicht was du meinst...!?
-
-    Evtl: weitere eindeutig unterscheidbare Aktivität
-    (habs mit trommelwirbel ['drum'] probiert, aber jetzt erkennt er nur:
-        walk --> wiimote ruhig am tisch oder ganz vorsichtiges gehen
-        drum --> schneller Trommelwirbel am Tisch )
-
-    PEP8 (is atm drin, aber man weiß ja nie am ende...)
-
-    Kommentar in Z.279?
-    
-    "a short description of the movements that can be distinguished"
-    """
